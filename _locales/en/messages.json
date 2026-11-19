@@ -1,0 +1,14 @@
+{
+  "extName": {
+    "message": "Web Reverse Inspector — Web UI & PPTX Bidirectional Engine",
+    "description": "Extension display name"
+  },
+  "extDescription": {
+    "message": "Client-side web UI/motion reverse engineering & 4s storyboard capture, with zero-dependency OOXML engine for 95%+ PPTX replication, 1:1 HTML preview, and editable .pptx export.",
+    "description": "Extension description"
+  },
+  "actionTitle": {
+    "message": "Open Web Reverse Inspector SidePanel",
+    "description": "Toolbar icon hover title"
+  }
+}

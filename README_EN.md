@@ -4,7 +4,8 @@
 
 **A 100% Client-Side Chrome Extension (Manifest V3) for Full-Layer Web UI/Effect Reverse Engineering & High-Fidelity Bidirectional PPTX ⇄ HTML Conversion**
 
-[![Version](https://img.shields.io/badge/version-v1.4.0-0ea5e9?style=flat-square)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v1.5.0-0ea5e9?style=flat-square)](./CHANGELOG.md)
+[![Bilingual UI](https://img.shields.io/badge/UI-English%20%2F%20%E4%B8%AD%E6%96%87-ec4899?style=flat-square)](#key-features)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-10b981?style=flat-square)](#quick-installation)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20(Vanilla%20ES%20Modules)-6366f1?style=flat-square)](#architecture)
 [![License: MIT](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](./LICENSE)
@@ -52,6 +53,10 @@ It delivers two end-to-end reverse-engineering & creation pipelines:
 - **🔑 Bring Your Own Key (BYOK) Direct SSE**: Native multimodal streaming to Google AI Studio (Gemini API) and OpenAI API, with keys stored strictly locally in `chrome.storage.local`.
 - **📋 Offline Pure Prompt Fallback**: Works completely offline with zero account/API required—outputs structured replication prompts plus one-click screenshot & prompt clipboard export.
 
+### 4. Built-in Bilingual UI (English ⇄ 简体中文 Instant Switch)
+- **🌍 Auto-Detect + One-Click Toggle**: Ships with native Chrome `_locales` (`en` / `zh_CN`) manifest localization, auto-detects browser UI language on first launch, and lets you switch instantly between **English** and **简体中文** via the top-right **`中文 / EN`** button (persisted in `chrome.storage.local`).
+- **End-to-End Coverage**: Covers the entire SidePanel UI, model menus, channel status messages, Shadow DOM in-page capture banners (inspector, 4s recorder, region cropper), and the 1:1 HTML deck player toolbar.
+
 ---
 
 ## 🧭 Architecture
@@ -74,7 +79,7 @@ flowchart LR
 No `npm install`, no bundler—load directly in Chrome / Edge in 30 seconds:
 
 1. **Get the source** (pick one):
-   - Download and unzip `web-reverse-inspector-v1.4.0.zip` from [Releases](https://github.com/633qaq/web-reverse-inspector/releases); or
+   - Download and unzip `web-reverse-inspector-v1.5.0.zip` from [Releases](https://github.com/633qaq/web-reverse-inspector/releases); or
    - Clone the repository:
      ```bash
      git clone https://github.com/633qaq/web-reverse-inspector.git
@@ -101,15 +106,16 @@ No `npm install`, no bundler—load directly in Chrome / Edge in 30 seconds:
 
 ```text
 web-reverse-inspector/
-├── manifest.json               # Chrome Manifest V3 manifest (v1.4.0)
+├── manifest.json               # Chrome Manifest V3 manifest (v1.5.0 with _locales)
+├── _locales/                   # Native Chrome manifest locales (en / zh_CN)
 ├── README.md / README_EN.md    # Bilingual documentation (ZH / EN)
 ├── CHANGELOG.md                # Bilingual release history
 ├── BRIEF.md                    # Live engineering specification
 ├── LICENSE                     # MIT License
-├── sidepanel/                  # Persistent SidePanel UI (dual workbench, 5 debug tabs, sandbox & exporters)
-├── content/                    # Shadow DOM capture scripts (inspector / recorder / cropper)
+├── sidepanel/                  # Persistent SidePanel UI (ZH/EN live switch, dual workbench, 5 debug tabs, sandbox & exporters)
+├── content/                    # Shadow DOM capture scripts (bilingual banners: inspector / recorder / cropper)
 ├── background/                 # Service Worker message bus, storyboard composer & AI routers
-└── utils/                      # Zero-dependency core engines (zip-lite / pptx-parser / pptx-html-renderer / html-slide-extractor / pptx-exporter / prompt-compiler / style-filter)
+└── utils/                      # Zero-dependency core engines (i18n / zip-lite / pptx-parser / pptx-html-renderer / html-slide-extractor / pptx-exporter / prompt-compiler / style-filter)
 ```
 
 ---

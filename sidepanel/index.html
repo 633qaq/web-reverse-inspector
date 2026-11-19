@@ -16,50 +16,58 @@
           <span>Reverse Inspector</span>
         </div>
         <div class="top-actions">
-          <button id="themeToggleBtn" class="icon-btn" title="切换深色/浅色主题">🌓</button>
-          <button id="toggleSettingsBtn" class="icon-btn" title="配置 API Key 与模型参数">⚙️</button>
+          <button
+            id="langToggleBtn"
+            class="lang-btn"
+            data-i18n="langToggleBtn"
+            data-i18n-title="langToggleTitle"
+            title="Switch UI to English / 切换为英文界面"
+          >EN</button>
+          <button id="themeToggleBtn" class="icon-btn" data-i18n-title="themeToggleTitle" title="切换深色/浅色主题">🌓</button>
+          <button id="toggleSettingsBtn" class="icon-btn" data-i18n-title="settingsToggleTitle" title="配置 API Key 与模型参数">⚙️</button>
         </div>
       </div>
 
       <div class="channel-row">
-        <select id="channelSelect" class="channel-select" title="选择大模型驱动通道">
-          <option value="web-chatgpt">🌐 ChatGPT Web 套餐</option>
-          <option value="web-gemini">🌐 Gemini Web 套餐</option>
-          <option value="byok-gemini">🔑 Google AI Studio (BYOK)</option>
-          <option value="byok-openai">🔑 OpenAI 官方 API (BYOK)</option>
+        <select id="channelSelect" class="channel-select" data-i18n-title="channelSelectTitle" title="选择大模型驱动通道">
+          <option value="web-chatgpt" data-i18n="channelWebChatgpt">🌐 ChatGPT Web 套餐</option>
+          <option value="web-gemini" data-i18n="channelWebGemini">🌐 Gemini Web 套餐</option>
+          <option value="byok-gemini" data-i18n="channelByokGemini">🔑 Google AI Studio (BYOK)</option>
+          <option value="byok-openai" data-i18n="channelByokOpenai">🔑 OpenAI 官方 API (BYOK)</option>
         </select>
 
-        <div id="statusBadge" class="status-badge status-warn" title="点击刷新通道连通状态">
+        <div id="statusBadge" class="status-badge status-warn" data-i18n-title="statusBadgeTitle" title="点击刷新通道连通状态">
           <span id="statusDot" class="status-dot"></span>
-          <span id="statusText">检测中...</span>
+          <span id="statusText" data-i18n="statusChecking">检测中...</span>
         </div>
       </div>
 
-      <!-- 新增：全通道（含 Web 套餐与 BYOK）常驻最新模型选择器 -->
+      <!-- 全通道（含 Web 套餐与 BYOK）常驻最新模型选择器 -->
       <div class="model-row">
-        <span class="model-label">🧠 模型</span>
-        <select id="activeModelSelect" class="model-select" title="选择当前通道使用的具体大模型版本"></select>
+        <span class="model-label" data-i18n="modelLabel">🧠 模型</span>
+        <select id="activeModelSelect" class="model-select" data-i18n-title="modelSelectTitle" title="选择当前通道使用的具体大模型版本"></select>
         <input
           id="customModelInput"
           class="custom-model-input hidden"
           type="text"
+          data-i18n-placeholder="customModelPlaceholder"
           placeholder="输入自定义模型名称 (如 GPT-6.2 Astra Max / 4 Argon)"
           autocomplete="off"
         />
       </div>
 
-      <div id="statusDetail" class="status-detail">正在同步本地会话与配置状态...</div>
+      <div id="statusDetail" class="status-detail" data-i18n="statusInitSync">正在同步本地会话与配置状态...</div>
     </header>
 
     <!-- API Key 与模型配置抽屉 -->
     <section id="settingsDrawer" class="settings-drawer hidden">
       <div class="drawer-header">
-        <span>🔑 BYOK 密钥与模型参数配置</span>
-        <button id="closeSettingsBtn" class="text-btn">收起 ✕</button>
+        <span data-i18n="drawerTitle">🔑 BYOK 密钥与模型参数配置</span>
+        <button id="closeSettingsBtn" class="text-btn" data-i18n="drawerClose">收起 ✕</button>
       </div>
 
       <div class="form-group">
-        <label for="geminiApiKey">Google AI Studio Key (Gemini API)</label>
+        <label for="geminiApiKey" data-i18n="labelGeminiKey">Google AI Studio Key (Gemini API)</label>
         <div class="input-row">
           <input id="geminiApiKey" type="password" placeholder="AIzaSy..." autocomplete="off" />
           <select id="geminiModel" class="sub-select">
@@ -74,7 +82,7 @@
       </div>
 
       <div class="form-group">
-        <label for="openaiApiKey">OpenAI API Key</label>
+        <label for="openaiApiKey" data-i18n="labelOpenaiKey">OpenAI API Key</label>
         <div class="input-row">
           <input id="openaiApiKey" type="password" placeholder="sk-..." autocomplete="off" />
           <select id="openaiModel" class="sub-select">
@@ -89,21 +97,21 @@
       </div>
 
       <div class="drawer-footer">
-        <span id="saveToast" class="save-toast">自动持久化至 chrome.storage.local</span>
-        <button id="saveConfigBtn" class="primary-sm-btn">保存并检测</button>
+        <span id="saveToast" class="save-toast" data-i18n="saveToastDefault">自动持久化至 chrome.storage.local</span>
+        <button id="saveConfigBtn" class="primary-sm-btn" data-i18n="saveConfigBtn">保存并检测</button>
       </div>
     </section>
 
     <!-- 四大核心采集与 PPTX 复刻操作区 -->
     <section class="capture-panel">
       <div class="section-label">
-        <span>工作台模式</span>
-        <span id="activeStageTag" class="stage-tag">v1.4 · HTML ⇄ PPTX 无损闭环</span>
+        <span data-i18n="workbenchModeLabel">工作台模式</span>
+        <span id="activeStageTag" class="stage-tag" data-i18n="stageTag">v1.5 · 中英双语 · HTML ⇄ PPTX 无损闭环</span>
       </div>
 
       <div class="workbench-tabs">
-        <button id="wbTabWeb" class="wb-tab active" data-wb="web">🌐 网页捕获逆向</button>
-        <button id="wbTabPptx" class="wb-tab" data-wb="pptx">📽️ PPTX 文件复刻 (95%+)</button>
+        <button id="wbTabWeb" class="wb-tab active" data-wb="web" data-i18n="wbTabWeb">🌐 网页捕获逆向</button>
+        <button id="wbTabPptx" class="wb-tab" data-wb="pptx" data-i18n="wbTabPptx">📽️ PPTX 文件复刻 (95%+)</button>
       </div>
 
       <!-- 模式 A：网页采集 -->
@@ -112,41 +120,41 @@
           <button class="capture-btn" data-mode="inspector">
             <span class="btn-emoji">🎯</span>
             <div class="btn-meta">
-              <span class="btn-title">吸管抓取特效</span>
-              <span class="btn-sub">DOM + CSS + Keyframes</span>
+              <span class="btn-title" data-i18n="btnInspectorTitle">吸管抓取特效</span>
+              <span class="btn-sub" data-i18n="btnInspectorSub">DOM + CSS + Keyframes</span>
             </div>
           </button>
 
           <button class="capture-btn" data-mode="recorder">
             <span class="btn-emoji">🎬</span>
             <div class="btn-meta">
-              <span class="btn-title">录制 4 秒动态分镜</span>
-              <span class="btn-sub">2×2 四格过程截图 + 极值</span>
+              <span class="btn-title" data-i18n="btnRecorderTitle">录制 4 秒动态分镜</span>
+              <span class="btn-sub" data-i18n="btnRecorderSub">2×2 四格过程截图 + 极值</span>
             </div>
           </button>
 
           <button class="capture-btn" data-mode="cropper">
             <span class="btn-emoji">📸</span>
             <div class="btn-meta">
-              <span class="btn-title">局部框选截图</span>
-              <span class="btn-sub">高清 Canvas 视觉裁剪</span>
+              <span class="btn-title" data-i18n="btnCropperTitle">局部框选截图</span>
+              <span class="btn-sub" data-i18n="btnCropperSub">高清 Canvas 视觉裁剪</span>
             </div>
           </button>
 
           <button class="capture-btn highlight-btn" data-mode="hybrid">
             <span class="btn-emoji">🔗</span>
             <div class="btn-meta">
-              <span class="btn-title">混合模式（DOM+截图）</span>
-              <span class="btn-sub">95% 还原度全量逆向</span>
+              <span class="btn-title" data-i18n="btnHybridTitle">混合模式（DOM+截图）</span>
+              <span class="btn-sub" data-i18n="btnHybridSub">95% 还原度全量逆向</span>
             </div>
           </button>
         </div>
 
         <div class="mock-bar">
-          <button id="runMockBtn" class="mock-trigger-btn">
+          <button id="runMockBtn" class="mock-trigger-btn" data-i18n="runMockBtn">
             🧪 一键测试流式逆向生成 (Mock 3D 全息卡片样本)
           </button>
-          <button id="stopStreamBtn" class="stop-btn hidden" title="中止当前流式输出">⏹ 停止</button>
+          <button id="stopStreamBtn" class="stop-btn hidden" data-i18n="stopStreamBtn" data-i18n-title="stopStreamTitle" title="中止当前流式输出">⏹ 停止</button>
         </div>
       </div>
 
@@ -155,21 +163,21 @@
         <div id="pptxDropZone" class="pptx-dropzone" tabindex="0">
           <input id="pptxFileInput" type="file" accept=".pptx" class="hidden" />
           <div class="pptx-drop-icon">📂</div>
-          <div class="pptx-drop-title">点击上传或拖入 <code>.pptx</code> 文件</div>
-          <div class="pptx-drop-sub">纯客户端解析 OOXML 四级继承链（母版/主题色/坐标/图片/表格/动画）</div>
+          <div class="pptx-drop-title" data-i18n-html="pptxDropTitleHtml">点击上传或拖入 <code>.pptx</code> 文件</div>
+          <div class="pptx-drop-sub" data-i18n="pptxDropSub">纯客户端解析 OOXML 四级继承链（母版/主题色/坐标/图片/表格/动画）</div>
         </div>
 
         <div id="pptxLoadedCard" class="pptx-loaded-card hidden">
           <div class="pptx-meta-row">
-            <span id="pptxMetaText" class="pptx-meta-text">未加载文件</span>
-            <button id="pptxReuploadBtn" class="text-btn">重新上传</button>
+            <span id="pptxMetaText" class="pptx-meta-text" data-i18n="pptxNotLoaded">未加载文件</span>
+            <button id="pptxReuploadBtn" class="text-btn" data-i18n="pptxReuploadBtn">重新上传</button>
           </div>
 
           <div class="pptx-controls-row">
-            <select id="pptxSlideSelect" class="pptx-select" title="选择目标幻灯片"></select>
-            <select id="pptxScopeSelect" class="pptx-scope-select" title="复刻范围">
-              <option value="single">仅当前页</option>
-              <option value="all">整份演示文稿</option>
+            <select id="pptxSlideSelect" class="pptx-select" data-i18n-title="pptxSlideSelectTitle" title="选择目标幻灯片"></select>
+            <select id="pptxScopeSelect" class="pptx-scope-select" data-i18n-title="pptxScopeSelectTitle" title="复刻范围">
+              <option value="single" data-i18n="pptxScopeSingle">仅当前页</option>
+              <option value="all" data-i18n="pptxScopeAll">整份演示文稿</option>
             </select>
           </div>
 
@@ -177,39 +185,39 @@
             <button id="pptxPreviewHtmlBtn" class="capture-btn highlight-btn">
               <span class="btn-emoji">👁️</span>
               <div class="btn-meta">
-                <span class="btn-title">1:1 HTML 演示稿</span>
-                <span class="btn-sub">按原比例/字体/媒体渲染</span>
+                <span class="btn-title" data-i18n="pptxPreviewTitle">1:1 HTML 演示稿</span>
+                <span class="btn-sub" data-i18n="pptxPreviewSub">按原比例/字体/媒体渲染</span>
               </div>
             </button>
 
             <button id="pptxGenPromptBtn" class="capture-btn">
               <span class="btn-emoji">📝</span>
               <div class="btn-meta">
-                <span class="btn-title">生成 95%+ Prompt</span>
-                <span class="btn-sub">输出精确参数复刻指令</span>
+                <span class="btn-title" data-i18n="pptxPromptTitle">生成 95%+ Prompt</span>
+                <span class="btn-sub" data-i18n="pptxPromptSub">输出精确参数复刻指令</span>
               </div>
             </button>
 
             <button id="pptxSendAiBtn" class="capture-btn">
               <span class="btn-emoji">🤖</span>
               <div class="btn-meta">
-                <span class="btn-title">AI 流式生成/精修</span>
-                <span class="btn-sub">发送至上方已选大模型</span>
+                <span class="btn-title" data-i18n="pptxAiTitle">AI 流式生成/精修</span>
+                <span class="btn-sub" data-i18n="pptxAiSub">发送至上方已选大模型</span>
               </div>
             </button>
 
             <button id="pptxDownloadHtmlBtn" class="capture-btn">
               <span class="btn-emoji">📥</span>
               <div class="btn-meta">
-                <span class="btn-title">导出 .html 演示稿</span>
-                <span class="btn-sub">单文件离线翻页放映</span>
+                <span class="btn-title" data-i18n="pptxHtmlTitle">导出 .html 演示稿</span>
+                <span class="btn-sub" data-i18n="pptxHtmlSub">单文件离线翻页放映</span>
               </div>
             </button>
           </div>
 
-          <button id="pptxExportFileBtn" class="export-pptx-banner-btn" title="将当前 Sandbox 预览确认无误的 HTML 演示稿无损转换为可编辑 .pptx 文件">
-            <span>📊 确认当前预览 → 导出可编辑 .pptx 文件</span>
-            <span class="export-pptx-badge">原生文本/形状/表格 + 2x SVG</span>
+          <button id="pptxExportFileBtn" class="export-pptx-banner-btn" data-i18n-title="pptxExportBannerTitleAttr" title="将当前 Sandbox 预览确认无误的 HTML 演示稿无损转换为可编辑 .pptx 文件">
+            <span data-i18n="pptxExportBannerTitle">📊 确认当前预览 → 导出可编辑 .pptx 文件</span>
+            <span class="export-pptx-badge" data-i18n="pptxExportBannerBadge">原生文本/形状/表格 + 2x SVG</span>
           </button>
         </div>
       </div>
@@ -219,40 +227,40 @@
     <section class="debug-section">
       <div id="debugHeader" class="debug-header">
         <div class="debug-title">
-          <span>🔍 底层采集特征预览</span>
-          <span id="captureSummaryBadge" class="mini-badge">未采集</span>
+          <span data-i18n="debugTitle">🔍 底层采集特征预览</span>
+          <span id="captureSummaryBadge" class="mini-badge" data-i18n="captureNotStarted">未采集</span>
         </div>
         <span id="debugCollapseIcon" class="collapse-icon">▼</span>
       </div>
 
       <div id="debugBody" class="debug-body">
         <div class="debug-tabs">
-          <button class="debug-tab active" data-debug-tab="visual">视觉截图</button>
-          <button class="debug-tab" data-debug-tab="layout">布局结构</button>
-          <button class="debug-tab" data-debug-tab="html">HTML 骨架</button>
-          <button class="debug-tab" data-debug-tab="css">CSS & 关键帧</button>
-          <button class="debug-tab" data-debug-tab="delta">4s 极值与分镜</button>
+          <button class="debug-tab active" data-debug-tab="visual" data-i18n="debugTabVisual">视觉截图</button>
+          <button class="debug-tab" data-debug-tab="layout" data-i18n="debugTabLayout">布局结构</button>
+          <button class="debug-tab" data-debug-tab="html" data-i18n="debugTabHtml">HTML 骨架</button>
+          <button class="debug-tab" data-debug-tab="css" data-i18n="debugTabCss">CSS & 关键帧</button>
+          <button class="debug-tab" data-debug-tab="delta" data-i18n="debugTabDelta">4s 极值与分镜</button>
         </div>
 
         <div id="debugContentVisual" class="debug-pane active">
-          <div id="screenshotEmpty" class="empty-hint">点击上方任意采集按钮或上传 .pptx 文件查看捕获特征</div>
-          <img id="screenshotImg" class="screenshot-preview hidden" alt="局部截图预览" />
+          <div id="screenshotEmpty" class="empty-hint" data-i18n="screenshotEmptyDefault">点击上方任意采集按钮或上传 .pptx 文件查看捕获特征</div>
+          <img id="screenshotImg" class="screenshot-preview hidden" data-i18n-alt="screenshotImgAlt" alt="局部截图预览" />
         </div>
 
         <div id="debugContentLayout" class="debug-pane">
-          <pre id="debugLayoutPre" class="code-box">// 尚未采集选区或 PPT 布局结构</pre>
+          <pre id="debugLayoutPre" class="code-box" data-i18n="debugLayoutEmpty">// 尚未采集选区或 PPT 布局结构</pre>
         </div>
 
         <div id="debugContentHtml" class="debug-pane">
-          <pre id="debugHtmlPre" class="code-box">// 尚未捕获 DOM 节点</pre>
+          <pre id="debugHtmlPre" class="code-box" data-i18n="debugHtmlEmpty">// 尚未捕获 DOM 节点</pre>
         </div>
 
         <div id="debugContentCss" class="debug-pane">
-          <pre id="debugCssPre" class="code-box">// 尚未提取 Computed CSS 与 @keyframes</pre>
+          <pre id="debugCssPre" class="code-box" data-i18n="debugCssEmpty">// 尚未提取 Computed CSS 与 @keyframes</pre>
         </div>
 
         <div id="debugContentDelta" class="debug-pane">
-          <pre id="debugDeltaPre" class="code-box">// 尚未录制 4 秒动态交互极值</pre>
+          <pre id="debugDeltaPre" class="code-box" data-i18n="debugDeltaEmpty">// 尚未录制 4 秒动态交互极值</pre>
         </div>
       </div>
     </section>
@@ -261,14 +269,14 @@
     <section class="output-section">
       <div class="output-toolbar">
         <div class="view-tabs">
-          <button id="tabPromptBtn" class="view-tab active">📝 逆向提示词</button>
-          <button id="tabSandboxBtn" class="view-tab">👁️ Sandbox 实时渲染预览</button>
+          <button id="tabPromptBtn" class="view-tab active" data-i18n="tabPromptBtn">📝 逆向提示词</button>
+          <button id="tabSandboxBtn" class="view-tab" data-i18n="tabSandboxBtn">👁️ Sandbox 实时渲染预览</button>
         </div>
 
         <div class="output-actions">
-          <button id="copyImageBtn" class="tool-btn" title="一键复制捕获的高清局部截图到剪贴板，可直接 Ctrl+V 粘贴给 AI">📸 复制截图</button>
-          <button id="copyCodeBtn" class="tool-btn" title="仅复制提取出的单文件 HTML 预览代码">复制代码</button>
-          <button id="copyPromptBtn" class="tool-btn primary-tool-btn" title="一键复制完整结构化逆向 Prompt">📋 一键复制 Prompt</button>
+          <button id="copyImageBtn" class="tool-btn" data-i18n="copyImageBtn" data-i18n-title="copyImageTitle" title="一键复制捕获的高清局部截图到剪贴板，可直接 Ctrl+V 粘贴给 AI">📸 复制截图</button>
+          <button id="copyCodeBtn" class="tool-btn" data-i18n="copyCodeBtn" data-i18n-title="copyCodeTitle" title="仅复制提取出的单文件 HTML 预览代码">复制代码</button>
+          <button id="copyPromptBtn" class="tool-btn primary-tool-btn" data-i18n="copyPromptBtn" data-i18n-title="copyPromptTitle" title="一键复制完整结构化逆向 Prompt">📋 一键复制 Prompt</button>
         </div>
       </div>
 
@@ -281,11 +289,12 @@
         <div id="promptOutput" class="prompt-output">
           <div class="placeholder-state">
             <div class="placeholder-icon">✨</div>
-            <p class="placeholder-title">等待捕获网页特效或上传 .pptx 文件</p>
-            <p class="placeholder-desc">
-              支持两种 95%+ 复刻工作流：<br />
+            <p class="placeholder-title" data-i18n="placeholderTitle">等待捕获网页特效或上传 .pptx 文件</p>
+            <p class="placeholder-desc" data-i18n-html="placeholderDescHtml">
+              支持三种 95%+ 复刻闭环：<br />
               1. <b>网页逆向</b>：全图层布局扫描 + 4 秒四格动态分镜 + 高清截图<br />
-              2. <b>PPTX 复刻</b>：本地四级 OOXML 解析 + 95%+ 复刻 Prompt + 1:1 HTML 演示稿预览与导出
+              2. <b>PPTX 复刻</b>：本地四级 OOXML 解析 + 95%+ Prompt + 1:1 HTML 演示稿<br />
+              3. <b>HTML 转 PPTX</b>：Sandbox 预览确认无误后一键导出原生可编辑 .pptx
             </p>
           </div>
         </div>
@@ -294,11 +303,11 @@
       <!-- 视图 2：Sandbox 实时渲染预览面板 -->
       <div id="sandboxPane" class="output-pane">
         <div class="sandbox-bar">
-          <span id="sandboxStatusText" class="sandbox-status">安全隔离沙箱 (`iframe[sandbox="allow-scripts"]`)</span>
+          <span id="sandboxStatusText" class="sandbox-status" data-i18n="sandboxStatusDefault">安全隔离沙箱 (`iframe[sandbox="allow-scripts"]`)</span>
           <div class="sandbox-actions">
-            <button id="sandboxDownloadHtmlBtn" class="sandbox-mini-btn" title="下载当前预览的纯净单文件 .html">📥 .html</button>
-            <button id="sandboxExportPptxBtn" class="sandbox-pptx-btn" title="确认当前预览无误后，一键高保真转换为可编辑 .pptx 文件">📊 确认并导出 .pptx</button>
-            <button id="refreshSandboxBtn" class="text-btn" title="重新挂载 Sandbox 预览">🔄</button>
+            <button id="sandboxDownloadHtmlBtn" class="sandbox-mini-btn" data-i18n="sandboxDownloadHtmlBtn" data-i18n-title="sandboxDownloadHtmlTitle" title="下载当前预览的纯净单文件 .html">📥 .html</button>
+            <button id="sandboxExportPptxBtn" class="sandbox-pptx-btn" data-i18n="sandboxExportPptxBtn" data-i18n-title="sandboxExportPptxTitle" title="确认当前预览无误后，一键高保真转换为可编辑 .pptx 文件">📊 确认并导出 .pptx</button>
+            <button id="refreshSandboxBtn" class="text-btn" data-i18n-title="refreshSandboxTitle" title="重新挂载 Sandbox 预览">🔄</button>
           </div>
         </div>
         <div class="sandbox-container">
@@ -306,7 +315,7 @@
             id="sandboxFrame"
             class="sandbox-frame"
             sandbox="allow-scripts"
-            title="Sandbox 实时渲染预览"
+            title="Sandbox Live Preview"
           ></iframe>
         </div>
       </div>

@@ -1,6 +1,6 @@
 # Project Brief: Web Reverse Inspector (网页特效与界面逆向 & PPTX 双向复刻引擎)
 
-> **文档说明**：本文件为本项目的**实时工程蓝图与规格说明书**（当前版本：`v1.4`）。根据工作区规则，每次修改代码前均须先阅读本文档，修改完成后须同步更新本文档。
+> **文档说明**：本文件为本项目的**实时工程蓝图与规格说明书**（当前版本：`v1.5`）。根据工作区规则，每次修改代码前均须先阅读本文档，修改完成后须同步更新本文档。
 
 ## 1. 项目目标
 开发一款基于 Chrome Manifest V3 的纯客户端常驻侧边栏（SidePanel）扩展（原生 ES Modules 免打包）。支持三大核心闭环工作流：
@@ -11,30 +11,32 @@
 ## 2. 标准工程目录结构
 ```text
 web-reverse-inspector/
-├── manifest.json               # Manifest V3 核心配置 v1.4.0 (sidePanel, scripting, cookies, activeTab, storage, tabs)
+├── manifest.json               # Manifest V3 核心配置 v1.5.0 (含 default_locale 与 __MSG_*__ 国际化)
+├── _locales/                   # Chrome 原生扩展清单多语言包 (en / zh_CN)
 ├── README.md / README_EN.md    # 中英双语开源说明文档（核心能力、架构图、快速安装与技术边界）
-├── CHANGELOG.md                # 中英双语版本演进说明 (v1.0.0 ~ v1.4.0)
+├── CHANGELOG.md                # 中英双语版本演进说明 (v1.0.0 ~ v1.5.0)
 ├── LICENSE                     # MIT 开源许可证
 ├── .gitignore                  # Git 忽略规则
 ├── GEMINI.md                   # 工作区规则（含中文规范、纯客户端红线、Shadow DOM 隔离与 BRIEF 同步要求）
 ├── BRIEF.md                    # 实时项目规格说明书（本文件）
 ├── sidepanel/
-│   ├── index.html              # 常驻侧边栏主界面（工作台双模式切换、通道与模型选择栏、调试 5 标签页、输出与 Sandbox 导出栏）
-│   ├── sidepanel.css           # 侧边栏样式表（深色/浅色自适应主题、PPTX 上传区及导出按钮样式）
-│   └── sidepanel.js            # 状态管理、Schema v2 配置迁移、PPTX 解析与 HTML/PPTX 双向导出、流式渲染、剪贴板导出
+│   ├── index.html              # 常驻侧边栏主界面（顶部中/英一键切换、双模式工作台、通道与模型选择栏、调试 5 标签页、输出与 Sandbox 导出栏）
+│   ├── sidepanel.css           # 侧边栏样式表（深色/浅色自适应主题、语言切换按钮、PPTX 上传区及导出按钮样式）
+│   └── sidepanel.js            # 状态管理、中英双语热切换与持久化、Schema v2 配置迁移、PPTX 解析与 HTML/PPTX 双向导出、流式渲染
 ├── content/
-│   ├── inspector.js            # Shadow DOM 吸管、空遮罩/ShadowRoot 穿透、选区全图层扫描、CSS/Keyframes 提取
-│   ├── recorder.js             # 4 秒多节点动态交互录制器（MutationObserver + rAF + 4 帧分镜抓拍）
-│   └── cropper.js              # Shadow DOM 十字准星拖拽选区遮罩（联动全图层布局扫描）
+│   ├── inspector.js            # Shadow DOM 吸管（双语横幅）、空遮罩/ShadowRoot 穿透、选区全图层扫描、CSS/Keyframes 提取
+│   ├── recorder.js             # 4 秒多节点动态交互录制器（双语录制角标 + MutationObserver + rAF + 4 帧分镜抓拍）
+│   └── cropper.js              # Shadow DOM 十字准星拖拽选区遮罩（双语提示条，联动全图层布局扫描）
 ├── background/
-│   ├── service-worker.js       # 核心消息总线、OffscreenCanvas 裁剪与 2×2 分镜拼接、纯色告警与统一流式调度
+│   ├── service-worker.js       # 核心消息总线（双语通道状态与回退通知）、OffscreenCanvas 裁剪与 2×2 分镜拼接、统一流式调度
 │   ├── router-web-chatgpt.js   # ChatGPT 网页版零侵入 DOM 桥接、UI 模型切换与递归 Markdown 提取
 │   ├── router-web-gemini.js    # Gemini 网页版 UI 模型切换、DOM 桥接、锁定态检测与 StreamGenerate RPC 兜底
 │   └── router-byok-api.js      # Google AI Studio (Gemini API) 与 OpenAI 原生 API 多模态 SSE 直连
 └── utils/
+    ├── i18n.js                 # 零依赖中英双语词典与 DOM 热切换引擎（185 组中英 Key + 浏览器语言自动探测）
     ├── zip-lite.js             # 零依赖纯 JS ZIP 解压与打包引擎（DecompressionStream / CompressionStream + CRC-32）
     ├── pptx-parser.js          # OOXML 四级继承链 (.pptx) 高精度解析引擎
-    ├── pptx-html-renderer.js   # 1:1 等比缩放单文件 HTML5 演示稿渲染与导出器
+    ├── pptx-html-renderer.js   # 1:1 等比缩放单文件 HTML5 演示稿渲染与导出器（支持中英双语播放控制栏）
     ├── html-slide-extractor.js # Sandbox 隔离环境 postMessage DOM 真实排版测量探针（多页/富文本/表格/2x SVG 光栅化）
     ├── pptx-exporter.js        # 严格遵循 ECMA-376 Schema 顺序的纯前端 OOXML .pptx 生成器
     ├── prompt-compiler.js      # 网页布局/分镜 Prompt 编译器 & PPTX 95%+ 复刻 Prompt 编译器
@@ -88,11 +90,12 @@ web-reverse-inspector/
 
 ## 4. 演进记录 & 当前已知限制
 
-### 4.1 关键演进（v1.0 → v1.4）
+### 4.1 关键演进（v1.0 → v1.5）
 1. **v1.0 → v1.1**：单节点拾取升级为选区全图层扫描 + Web Components 穿透；移除编造的 3D 极值与假兜底代码；新增纯色截图告警。
 2. **v1.1 → v1.2**：2 秒录制升级为 4 秒多节点录制 + 2×2 四格动态分镜；Web 通道升级为零侵入 DOM 桥接与最新模型选择器（GPT-6 / Gemini 4 系列）。
 3. **v1.2 → v1.3**：新增纯客户端 `.pptx` 上传解析引擎（零依赖 ZIP + OOXML 四级继承）、95%+ PPT 复刻 Prompt 编译器与 1:1 单文件 HTML 演示稿渲染导出，并修正调试区 `4s 极值与分镜` 标签文案。
-4. **v1.3 → v1.4（当前发布版）**：打通 **HTML 演示稿预览确认 → 高保真可编辑 `.pptx` 一键转换导出** 闭环；在 `zip-lite.js` 中补全原生 ZIP 打包，新增 Sandbox DOM 排版测量探针 `html-slide-extractor.js` 与严格合规 OOXML 生成器 `pptx-exporter.js`，并通过 43 项往返闭环自动化校验；升级 `manifest.json` 至 `1.4.0`，完善中英双语开源文档（`README.md` / `README_EN.md` / `CHANGELOG.md` / `LICENSE`）并公开发布至 GitHub（`633qaq/web-reverse-inspector`）与 `v1.4.0` Release。
+4. **v1.3 → v1.4**：打通 **HTML 演示稿预览确认 → 高保真可编辑 `.pptx` 一键转换导出** 闭环；在 `zip-lite.js` 中补全原生 ZIP 打包，新增 Sandbox DOM 排版测量探针 `html-slide-extractor.js` 与严格合规 OOXML 生成器 `pptx-exporter.js`，公开发布至 GitHub（`633qaq/web-reverse-inspector`）。
+5. **v1.4 → v1.5（本次更新）**：新增 **全扩展中英双语运行界面切换（简体中文 ⇄ English）**——补全 Chrome 原生 `_locales/en` 与 `_locales/zh_CN` 清单多语言、统一词典引擎 `utils/i18n.js`（185 组中英 Key + 浏览器语言自动探测）、侧边栏右上角 `EN / 中文` 毫秒级热切换并持久化，覆盖 SidePanel 全 UI、Service Worker 状态/回退提示、目标网页 Shadow DOM 吸管/录制/框选横幅及 1:1 HTML 演示稿播放控制栏。
 
 ### 4.2 当前已知限制与待优化项
 1. **桌面 PowerPoint / WPS 软件进程无法直接读取或原地改写（第 1 点边界）**：受限于浏览器沙箱及纯客户端 MV3 架构红线，当前通过文件上传与文件导出形成完整闭环；若未来需直接操作桌面运行中的 PPT 进程，需引入 Native Messaging 本地宿主或 Office Add-in。

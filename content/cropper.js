@@ -19,8 +19,9 @@
   /**
    * 创建挂载在独立 Shadow DOM 中的全屏十字准星裁剪遮罩
    */
-  function mountCropperOverlay() {
+  function mountCropperOverlay(lang = 'zh') {
     unmountCropperOverlay();
+    const isEn = String(lang || window.__WRI_LANG__ || '').toLowerCase().startsWith('en');
 
     cropShadowHost = document.createElement('div');
     cropShadowHost.id = '__wri-cropper-shadow-host__';
@@ -94,9 +95,13 @@
 
     const banner = document.createElement('div');
     banner.className = 'wri-crop-banner';
+    const bannerPrompt = isEn
+      ? '📸 Region Crop: Hold left mouse button and drag to select target area'
+      : '📸 局部框选截图：按住鼠标左键拖拽框选目标区域';
+    const escText = isEn ? 'Esc Cancel' : 'Esc 取消';
     banner.innerHTML = `
-      <span>📸 局部框选截图：按住鼠标左键拖拽框选目标区域</span>
-      <span class="wri-kbd">Esc 取消</span>
+      <span>${bannerPrompt}</span>
+      <span class="wri-kbd">${escText}</span>
     `;
 
     selectionBox = document.createElement('div');
@@ -262,11 +267,12 @@
     }
   }
 
-  function startCropper() {
+  function startCropper(lang = 'zh') {
     stopCropper();
     isCropping = true;
     isDragging = false;
-    mountCropperOverlay();
+    window.__WRI_LANG__ = String(lang || '').toLowerCase().startsWith('en') ? 'en' : 'zh';
+    mountCropperOverlay(window.__WRI_LANG__);
   }
 
   function stopCropper() {
@@ -281,7 +287,7 @@
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     try {
       if (message?.type === 'ACTIVATE_CROPPER') {
-        startCropper();
+        startCropper(message.lang || 'zh');
         sendResponse({ ok: true });
         return true;
       }

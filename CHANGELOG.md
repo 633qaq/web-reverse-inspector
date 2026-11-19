@@ -4,6 +4,26 @@ All notable changes to **Web Reverse Inspector** are documented in this file (Bi
 
 ---
 
+## [v1.5.0] - 2026-11-19
+
+### 🇨🇳 简体中文说明
+**全扩展中英双语运行界面上线：支持 Chrome 自动语言匹配与侧边栏右上角一键实时热切换（简体中文 ⇄ English）。**
+
+- **新增**：Chrome 扩展清单原生国际化（`_locales/en/messages.json`、`_locales/zh_CN/messages.json`，`manifest.json` 升级至 `1.5.0` 并配置 `default_locale: "en"`），Chrome 扩展管理页与工具栏提示按浏览器语言自动显示中文或英文。
+- **新增**：零依赖统一双语词典与热切换引擎（`utils/i18n.js`，185 组严格对称中英词条，含浏览器语言自动探测与 `{var}` 插值校验）。
+- **新增**：侧边栏右上角新增 **`EN / 中文`** 切换按钮，点击后毫秒级热更新全界面文案、模型菜单、PPTX 页码选择、Sandbox 提示与通道状态，并持久化至 `chrome.storage.local`。
+- **升级**：目标网页注入的 Shadow DOM 提示横幅（`inspector.js` / `recorder.js` / `cropper.js`）、后台通道状态与回退通知（`service-worker.js`）以及 1:1 HTML 演示稿底部控制条（`pptx-html-renderer.js`）全部支持中英双语联动（并顺手修正 `inspector.js` 录制横幅中一处 `2 秒` 旧文案为 `4 秒`）。
+
+### 🇺🇸 English Release Notes
+**Full Bilingual Runtime UI: Auto-detects Chrome language with an instant top-bar `EN / 中文` live toggle.**
+
+- **Added**: Native Chrome manifest localization (`_locales/en/messages.json` and `_locales/zh_CN/messages.json`; bumped `manifest.json` to `1.5.0` with `default_locale: "en"`).
+- **Added**: Zero-dependency bilingual dictionary & live DOM i18n engine (`utils/i18n.js`, 185 strictly matched ZH/EN keys with browser language auto-detection).
+- **Added**: Top-right **`EN / 中文`** toggle button in the SidePanel for instant zero-reload language switching persisted to `chrome.storage.local`.
+- **Improved**: Full bilingual support across injected Shadow DOM capture banners (`inspector.js`, `recorder.js`, `cropper.js`), Service Worker channel status/fallback messages (`service-worker.js`), and 1:1 HTML slide deck player controls (`pptx-html-renderer.js`).
+
+---
+
 ## [v1.4.0] - 2026-11-19
 
 ### 🇨🇳 简体中文说明

@@ -8,50 +8,53 @@ import { parsePptxBuffer } from '../utils/pptx-parser.js';
 import { renderPptxToHtmlDeck } from '../utils/pptx-html-renderer.js';
 import { injectSandboxExportProbe, requestSlidesSnapshotFromSandbox } from '../utils/html-slide-extractor.js';
 import { exportSlidesModelToPptxBlob } from '../utils/pptx-exporter.js';
+import { t, applyDomI18n, detectDefaultLang, normalizeLang } from '../utils/i18n.js';
 
 const STORAGE_KEY = 'wri_user_config_v1';
 
 /**
- * 各驱动通道可选的最新大模型清单（1:1 对应 ChatGPT 与 Gemini 官方最新模型菜单）
+ * 根据当前界面语言构建各驱动通道可选的最新大模型清单
  */
-const CHANNEL_MODEL_OPTIONS = {
-  'web-chatgpt': [
-    { value: 'GPT-6.2 Astra', label: 'GPT-6.2 Astra (Max · 旗舰推荐)' },
-    { value: 'GPT-6.2 Sol', label: 'GPT-6.2 Sol' },
-    { value: 'GPT-6.1 Sol', label: 'GPT-6.1 Sol' },
-    { value: 'GPT-6.1 Terra', label: 'GPT-6.1 Terra' },
-    { value: 'GPT-6 Astra', label: 'GPT-6 Astra' },
-    { value: 'auto', label: '默认 (推荐模型集)' },
-    { value: 'custom', label: '✏️ 自定义模型...' }
-  ],
-  'web-gemini': [
-    { value: '4 Argon', label: '4 Argon · Code & analysis (编程与分析)' },
-    { value: '4 Carbon', label: '4 Carbon · Most complex work (最高复杂度)' },
-    { value: '4 Hydrogen', label: '4 Hydrogen · Everyday help (日常帮助)' },
-    { value: '3.1 Pro', label: '3.1 Pro · Detailed research (深度研究)' },
-    { value: '3.5 Flash-Lite', label: '3.5 Flash-Lite · Quick answers (快速回答)' },
-    { value: 'auto', label: '跟随网页端当前模型' },
-    { value: 'custom', label: '✏️ 自定义模型...' }
-  ],
-  'byok-gemini': [
-    { value: 'gemini-4-argon', label: '4 Argon (Code & analysis)' },
-    { value: 'gemini-4-carbon', label: '4 Carbon (Most complex work)' },
-    { value: 'gemini-4-hydrogen', label: '4 Hydrogen (Everyday help)' },
-    { value: 'gemini-3.1-pro', label: '3.1 Pro (Detailed research)' },
-    { value: 'gemini-3.5-flash-lite', label: '3.5 Flash-Lite (Quick answers)' },
-    { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro' },
-    { value: 'custom', label: '✏️ 自定义模型 ID...' }
-  ],
-  'byok-openai': [
-    { value: 'gpt-6.2-astra', label: 'GPT-6.2 Astra' },
-    { value: 'gpt-6.2-sol', label: 'GPT-6.2 Sol' },
-    { value: 'gpt-6.1-sol', label: 'GPT-6.1 Sol' },
-    { value: 'gpt-6.1-terra', label: 'GPT-6.1 Terra' },
-    { value: 'gpt-6-astra', label: 'GPT-6 Astra' },
-    { value: 'gpt-4o', label: 'gpt-4o' },
-    { value: 'custom', label: '✏️ 自定义模型 ID...' }
-  ]
-};
+function getChannelModelOptions(lang = 'zh') {
+  return {
+    'web-chatgpt': [
+      { value: 'GPT-6.2 Astra', label: t('modelChatgptAstra', {}, lang) },
+      { value: 'GPT-6.2 Sol', label: 'GPT-6.2 Sol' },
+      { value: 'GPT-6.1 Sol', label: 'GPT-6.1 Sol' },
+      { value: 'GPT-6.1 Terra', label: 'GPT-6.1 Terra' },
+      { value: 'GPT-6 Astra', label: 'GPT-6 Astra' },
+      { value: 'auto', label: t('modelChatgptAuto', {}, lang) },
+      { value: 'custom', label: t('modelCustomOption', {}, lang) }
+    ],
+    'web-gemini': [
+      { value: '4 Argon', label: t('modelGeminiArgon', {}, lang) },
+      { value: '4 Carbon', label: t('modelGeminiCarbon', {}, lang) },
+      { value: '4 Hydrogen', label: t('modelGeminiHydrogen', {}, lang) },
+      { value: '3.1 Pro', label: t('modelGemini31Pro', {}, lang) },
+      { value: '3.5 Flash-Lite', label: t('modelGemini35Flash', {}, lang) },
+      { value: 'auto', label: t('modelGeminiAuto', {}, lang) },
+      { value: 'custom', label: t('modelCustomOption', {}, lang) }
+    ],
+    'byok-gemini': [
+      { value: 'gemini-4-argon', label: '4 Argon (Code & analysis)' },
+      { value: 'gemini-4-carbon', label: '4 Carbon (Most complex work)' },
+      { value: 'gemini-4-hydrogen', label: '4 Hydrogen (Everyday help)' },
+      { value: 'gemini-3.1-pro', label: '3.1 Pro (Detailed research)' },
+      { value: 'gemini-3.5-flash-lite', label: '3.5 Flash-Lite (Quick answers)' },
+      { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro' },
+      { value: 'custom', label: t('modelCustomIdOption', {}, lang) }
+    ],
+    'byok-openai': [
+      { value: 'gpt-6.2-astra', label: 'GPT-6.2 Astra' },
+      { value: 'gpt-6.2-sol', label: 'GPT-6.2 Sol' },
+      { value: 'gpt-6.1-sol', label: 'GPT-6.1 Sol' },
+      { value: 'gpt-6.1-terra', label: 'GPT-6.1 Terra' },
+      { value: 'gpt-6-astra', label: 'GPT-6 Astra' },
+      { value: 'gpt-4o', label: 'gpt-4o' },
+      { value: 'custom', label: t('modelCustomIdOption', {}, lang) }
+    ]
+  };
+}
 
 const state = {
   config: {
@@ -64,7 +67,8 @@ const state = {
     openaiModel: 'gpt-6.2-astra',
     customModelId: '',
     modelSchemaVersion: 2,
-    theme: 'dark'
+    theme: 'dark',
+    lang: detectDefaultLang()
   },
   isStreaming: false,
   isExportingPptx: false,
@@ -76,6 +80,10 @@ const state = {
   pptxDoc: null
 };
 
+function tr(key, vars = {}) {
+  return t(key, vars, state.config.lang);
+}
+
 // DOM 引用
 const els = {
   channelSelect: document.getElementById('channelSelect'),
@@ -84,6 +92,7 @@ const els = {
   statusBadge: document.getElementById('statusBadge'),
   statusText: document.getElementById('statusText'),
   statusDetail: document.getElementById('statusDetail'),
+  langToggleBtn: document.getElementById('langToggleBtn'),
   themeToggleBtn: document.getElementById('themeToggleBtn'),
   toggleSettingsBtn: document.getElementById('toggleSettingsBtn'),
   closeSettingsBtn: document.getElementById('closeSettingsBtn'),
@@ -150,26 +159,26 @@ async function sendMessageSafe(message, timeoutMs = 8000) {
   return new Promise((resolve) => {
     let settled = false;
     const timer = setTimeout(() => {
-      if (!settled) {
-        settled = true;
-        resolve({ ok: false, timeout: true, error: '请求后台 Service Worker 超时' });
-      }
-    }, timeoutMs);
-
-    try {
-      chrome.runtime.sendMessage(message, (response) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        if (chrome.runtime.lastError) {
-          resolve({
-            ok: false,
-            error: chrome.runtime.lastError.message || 'Service Worker 未响应'
-          });
-          return;
+        if (!settled) {
+          settled = true;
+          resolve({ ok: false, timeout: true, error: tr('swTimeoutError') });
         }
-        resolve(response || { ok: false, error: '空响应' });
-      });
+      }, timeoutMs);
+
+      try {
+        chrome.runtime.sendMessage(message, (response) => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timer);
+          if (chrome.runtime.lastError) {
+            resolve({
+              ok: false,
+              error: chrome.runtime.lastError.message || tr('swNoResponse')
+            });
+            return;
+          }
+          resolve(response || { ok: false, error: tr('swEmptyResponse') });
+        });
     } catch (err) {
       if (!settled) {
         settled = true;
@@ -197,7 +206,8 @@ function getStoredModelForChannel(channel) {
 function renderActiveModelSelector() {
   if (!els.activeModelSelect) return;
   const channel = els.channelSelect.value || 'web-chatgpt';
-  const options = CHANNEL_MODEL_OPTIONS[channel] || CHANNEL_MODEL_OPTIONS['web-chatgpt'];
+  const modelMap = getChannelModelOptions(state.config.lang);
+  const options = modelMap[channel] || modelMap['web-chatgpt'];
   const currentModel = getStoredModelForChannel(channel);
 
   els.activeModelSelect.innerHTML = '';
@@ -285,8 +295,54 @@ async function loadPersistedConfig() {
   els.geminiModel.value = state.config.geminiModel || 'gemini-4-argon';
   els.openaiApiKey.value = state.config.openaiApiKey || '';
   els.openaiModel.value = state.config.openaiModel || 'gpt-6.2-astra';
-  renderActiveModelSelector();
   applyTheme(state.config.theme || 'dark');
+  applyLanguage(state.config.lang || detectDefaultLang(), { refreshStatus: false });
+}
+
+/**
+ * 热切换整个侧边栏界面语言（中文 ⇄ English）并刷新所有动态下拉、状态与预览提示
+ */
+function applyLanguage(lang, { refreshStatus = false } = {}) {
+  const locale = normalizeLang(lang);
+  state.config.lang = locale;
+  applyDomI18n(document, locale);
+  renderActiveModelSelector();
+
+  // 若已加载 PPTX 文档，刷新其元信息与幻灯片下拉框文本
+  if (state.pptxDoc) {
+    if (els.pptxMetaText) {
+      els.pptxMetaText.textContent = tr('pptxMetaSummary', {
+        file: state.pptxDoc.fileName,
+        count: state.pptxDoc.slideCount,
+        ratio: state.pptxDoc.ratioLabel
+      });
+    }
+    if (els.pptxSlideSelect) {
+      const prevVal = els.pptxSlideSelect.value || '0';
+      els.pptxSlideSelect.innerHTML = '';
+      state.pptxDoc.slides.forEach((s, idx) => {
+        const opt = document.createElement('option');
+        opt.value = String(idx);
+        opt.textContent = tr('pptxSlideOption', { num: s.slideNumber, title: s.title });
+        els.pptxSlideSelect.appendChild(opt);
+      });
+      els.pptxSlideSelect.value = prevVal;
+    }
+    renderPptxDebugPreview(Number(els.pptxSlideSelect?.value || 0));
+  } else if (state.lastCapturePayload) {
+    renderCapturePreview(state.lastCapturePayload);
+  }
+
+  // 若当前 Sandbox 处于无代码提示状态，实时同步其语言
+  if (!state.extractedHtmlCode) {
+    updateSandboxPreview('');
+  } else {
+    els.sandboxStatusText.textContent = tr('sandboxMountedStatus', { chars: state.extractedHtmlCode.length });
+  }
+
+  if (refreshStatus) {
+    refreshChannelStatus();
+  }
 }
 
 /**
@@ -299,15 +355,16 @@ async function saveConfigToStorage(showToast = true) {
     channel: els.channelSelect.value,
     geminiApiKey: els.geminiApiKey.value.trim(),
     openaiApiKey: els.openaiApiKey.value.trim(),
-    theme: document.documentElement.getAttribute('data-theme') || 'dark'
+    theme: document.documentElement.getAttribute('data-theme') || 'dark',
+    lang: normalizeLang(state.config.lang)
   };
 
   try {
     await chrome.storage.local.set({ [STORAGE_KEY]: state.config });
     if (showToast && els.saveToast) {
-      els.saveToast.textContent = '✅ 已保存至本地存储';
+      els.saveToast.textContent = tr('saveToastSaved');
       setTimeout(() => {
-        els.saveToast.textContent = '自动持久化至 chrome.storage.local';
+        els.saveToast.textContent = tr('saveToastDefault');
       }, 2000);
     }
   } catch (err) {
@@ -330,7 +387,7 @@ function applyTheme(theme) {
  * 刷新顶部通道连通状态徽标
  */
 async function refreshChannelStatus() {
-  els.statusText.textContent = '检测中...';
+  els.statusText.textContent = tr('statusChecking');
   const res = await sendMessageSafe({
     type: 'CHECK_CHANNEL_STATUS',
     config: state.config
@@ -343,8 +400,8 @@ async function refreshChannelStatus() {
     els.statusBadge.classList.toggle('status-ok', Boolean(ready));
     els.statusBadge.classList.toggle('status-warn', !ready);
   } else {
-    els.statusText.textContent = '本地就绪';
-    els.statusDetail.textContent = res?.error || '可直接点击采集按钮抓取网页特效';
+    els.statusText.textContent = tr('statusLocalReady');
+    els.statusDetail.textContent = res?.error || tr('statusReadyFallbackDetail');
     els.statusBadge.classList.remove('status-ok');
     els.statusBadge.classList.add('status-warn');
   }
@@ -362,10 +419,10 @@ function renderCapturePreview(payload) {
   els.debugCollapseIcon.style.transform = 'rotate(0deg)';
 
   const modeMap = {
-    inspector: '🎯 吸管抓取',
-    recorder: '🎬 4s 动态分镜',
-    cropper: '📸 局部截图',
-    hybrid: '🔗 混合模式'
+    inspector: tr('modeInspectorLabel'),
+    recorder: tr('modeRecorderLabel'),
+    cropper: tr('modeCropperLabel'),
+    hybrid: tr('modeHybridLabel')
   };
   const label = modeMap[payload.captureMode] || payload.captureMode;
   const box = payload.boundingBox || {};
@@ -382,7 +439,7 @@ function renderCapturePreview(payload) {
   }
 
   // 2. HTML 骨架
-  els.debugHtmlPre.textContent = payload.html || '// 无 HTML 数据';
+  els.debugHtmlPre.textContent = payload.html || tr('debugHtmlEmpty');
 
   // 2.1 选区布局结构（与发给 AI 的 Prompt 第一部分完全一致）
   if (els.debugLayoutPre) {
@@ -392,7 +449,7 @@ function renderCapturePreview(payload) {
   // 截图有效性提示
   if (payload.screenshotSuspect) {
     const share = Math.round((payload.visualPalette?.dominantShare || 0) * 100);
-    els.captureSummaryBadge.textContent += ` · ⚠️ 截图 ${share}% 为单一颜色`;
+    els.captureSummaryBadge.textContent += tr('badgeSolidColorWarn', { share });
   }
 
   // 3. Computed CSS + Keyframes
@@ -402,7 +459,7 @@ function renderCapturePreview(payload) {
 
   // 4. 4秒动态交互极值
   els.debugDeltaPre.textContent = JSON.stringify(
-    payload.interactionDeltas || { note: '当前模式未启用 4 秒动态分镜录制，可点击【🎬 录制 4 秒动态分镜】采集' },
+    payload.interactionDeltas || { note: tr('debugDeltaNoRecordNote') },
     null,
     2
   );
@@ -431,8 +488,8 @@ function updateSandboxPreview(htmlCode, { forceReload = false } = {}) {
   if (!code) {
     state.sandboxMountedCode = '';
     state.sandboxReadyPromise = null;
-    els.sandboxStatusText.textContent = '当前输出为「发给 AI 的复刻 Prompt」，请连同截图发给 AI 生成代码（或配置 API Key 直连生成）';
-    els.sandboxFrame.srcdoc = `<!DOCTYPE html><html><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#090d16;color:#94a3b8;font-family:sans-serif;font-size:13px;padding:24px;text-align:center;line-height:1.6;"><div>当前为 <b>复刻 Prompt 提取模式</b>（不含虚假拼凑代码）。<br/>请点击右上角 <b>【📸 复制截图】+【📋 一键复制 Prompt】</b> 发送给 AI 编程工具生成 1:1 代码，<br/>或在右上角 ⚙️ 配置 API Key 由模型直接生成代码后在此实时预览。</div></body></html>`;
+    els.sandboxStatusText.textContent = tr('sandboxPromptModeStatus');
+    els.sandboxFrame.srcdoc = `<!DOCTYPE html><html><body style="margin:0;height:100vh;display:flex;align-items:center;justify-content:center;background:#090d16;color:#94a3b8;font-family:sans-serif;font-size:13px;padding:24px;text-align:center;line-height:1.6;"><div>${tr('sandboxPromptModeBodyHtml')}</div></body></html>`;
     return;
   }
 
@@ -455,11 +512,11 @@ function updateSandboxPreview(htmlCode, { forceReload = false } = {}) {
   });
 
   els.sandboxFrame.srcdoc = injectSandboxExportProbe(code);
-  els.sandboxStatusText.textContent = `已实时挂载单文件预览 (${code.length} chars) · 确认无误可一键导出 .pptx`;
+  els.sandboxStatusText.textContent = tr('sandboxMountedStatus', { chars: code.length });
 }
 
 /**
- * 在真实网页中激活对应的采集器（吸管 / 2s录制 / 局部截图 / 混合模式）
+ * 在真实网页中激活对应的采集器（吸管 / 4s录制 / 局部截图 / 混合模式）
  */
 async function startPageCapture(mode = 'hybrid') {
   els.captureBtns.forEach((btn) => {
@@ -469,12 +526,12 @@ async function startPageCapture(mode = 'hybrid') {
   switchOutputView('prompt');
 
   const modeHintMap = {
-    inspector: '🎯 已在当前网页开启 Shadow DOM 吸管，请移动鼠标并点击目标元素（Esc 取消）',
-    recorder: '🎬 请先在网页中点击目标区域，随后将自动开启 4 秒动态分镜录制',
-    cropper: '📸 已在当前网页开启十字准星截图遮罩，请按住左键拖拽框选区域（Esc 取消）',
-    hybrid: '🔗 混合全量模式已开启：请在网页点击目标组件（自动抓取 DOM+CSS+局部截图）'
+    inspector: tr('hintStartInspector'),
+    recorder: tr('hintStartRecorder'),
+    cropper: tr('hintStartCropper'),
+    hybrid: tr('hintStartHybrid')
   };
-  els.statusDetail.textContent = modeHintMap[mode] || '请在网页中选择目标元素';
+  els.statusDetail.textContent = modeHintMap[mode] || tr('hintStartDefault');
 
   const res = await sendMessageSafe({
     type: 'START_PAGE_CAPTURE',
@@ -483,10 +540,10 @@ async function startPageCapture(mode = 'hybrid') {
   });
 
   if (res && res.ok && res.fallbackMock && res.capturePayload) {
-    els.statusDetail.textContent = res.notice || '当前页面受限，已自动回退至 Mock 样本演示';
+    els.statusDetail.textContent = res.notice || tr('hintRestrictedMock');
     renderCapturePreview(res.capturePayload);
   } else if (res && !res.ok) {
-    els.statusDetail.textContent = `启动采集失败: ${res.error || '请刷新目标网页后重试'}`;
+    els.statusDetail.textContent = tr('hintStartFail', { error: res.error || tr('hintStartFailDefault') });
   }
 }
 
@@ -538,8 +595,8 @@ function setupRuntimeStreamListener() {
         if (message.capturePayload) {
           renderCapturePreview(message.capturePayload);
           els.statusDetail.textContent = message.capturePayload.screenshotSuspect
-            ? '⚠️ 已采集，但截图几乎是纯色，可能没拍到视频/画布画面。建议等画面加载后重新采集'
-            : `✅ 已采集 ${message.capturePayload.tagName || '目标区域'}，正在生成...`;
+            ? tr('hintCaptureSuspect')
+            : tr('hintCaptureReady', { target: message.capturePayload.tagName || 'Element' });
         }
         sendResponse({ ok: true });
         return false;
@@ -547,7 +604,7 @@ function setupRuntimeStreamListener() {
 
       if (message.type === 'CAPTURE_CANCELLED_NOTIFY') {
         els.captureBtns.forEach((btn) => btn.classList.remove('active-mode'));
-        els.statusDetail.textContent = '已取消网页采集操作';
+        els.statusDetail.textContent = tr('hintCaptureCancelled');
         sendResponse({ ok: true });
         return false;
       }
@@ -614,7 +671,7 @@ function setupRuntimeStreamListener() {
         els.promptOutput.classList.remove('streaming');
         els.streamProgressWrap.classList.add('hidden');
         els.stopStreamBtn.classList.add('hidden');
-        els.promptOutput.textContent += '\n\n[⏹ 已手动中止流式生成]';
+        els.promptOutput.textContent += tr('streamAbortedNote');
         sendResponse({ ok: true });
         return false;
       }
@@ -631,9 +688,9 @@ function setupRuntimeStreamListener() {
 async function copyScreenshotToClipboard(btnElement) {
   const dataUrl = state.lastCapturePayload?.screenshotBase64;
   if (!dataUrl || !dataUrl.startsWith('data:image/png')) {
-    btnElement.textContent = '⚠️ 暂无截图';
+    btnElement.textContent = tr('copyNoImage');
     setTimeout(() => {
-      btnElement.textContent = '📸 复制截图';
+      btnElement.textContent = tr('copyImageBtn');
     }, 1500);
     return;
   }
@@ -644,15 +701,15 @@ async function copyScreenshotToClipboard(btnElement) {
     await navigator.clipboard.write([
       new ClipboardItem({ 'image/png': blob })
     ]);
-    btnElement.textContent = '✅ 截图已复制!';
+    btnElement.textContent = tr('copyImageOk');
     setTimeout(() => {
-      btnElement.textContent = '📸 复制截图';
+      btnElement.textContent = tr('copyImageBtn');
     }, 1600);
   } catch (err) {
     console.warn('[WRI SidePanel] 复制截图失败:', err);
-    btnElement.textContent = '❌ 复制失败';
+    btnElement.textContent = tr('copyFail');
     setTimeout(() => {
-      btnElement.textContent = '📸 复制截图';
+      btnElement.textContent = tr('copyImageBtn');
     }, 1600);
   }
 }
@@ -660,24 +717,24 @@ async function copyScreenshotToClipboard(btnElement) {
 /**
  * 复制文本到剪贴板并反馈按钮状态
  */
-async function copyTextWithFeedback(text, btnElement, defaultLabel) {
+async function copyTextWithFeedback(text, btnElement, labelKey) {
   if (!text || !text.trim()) {
-    btnElement.textContent = '⚠️ 暂无内容';
+    btnElement.textContent = tr('copyEmpty');
     setTimeout(() => {
-      btnElement.textContent = defaultLabel;
+      btnElement.textContent = tr(labelKey);
     }, 1500);
     return;
   }
   try {
     await navigator.clipboard.writeText(text);
-    btnElement.textContent = '✅ 已复制!';
+    btnElement.textContent = tr('copyTextOk');
     setTimeout(() => {
-      btnElement.textContent = defaultLabel;
+      btnElement.textContent = tr(labelKey);
     }, 1600);
   } catch (_err) {
-    btnElement.textContent = '❌ 复制失败';
+    btnElement.textContent = tr('copyFail');
     setTimeout(() => {
-      btnElement.textContent = defaultLabel;
+      btnElement.textContent = tr(labelKey);
     }, 1600);
   }
 }
@@ -701,20 +758,27 @@ function renderPptxDebugPreview(slideIndex = 0) {
   if (!doc || !doc.slides?.length) return;
   const slide = doc.slides[Math.max(0, Math.min(doc.slides.length - 1, slideIndex))];
 
-  els.captureSummaryBadge.textContent = `📽️ ${doc.fileName} · 第 ${slide.slideNumber}/${doc.slideCount} 页 (${doc.ratioLabel})`;
+  els.captureSummaryBadge.textContent = tr('pptxDebugBadge', {
+    file: doc.fileName,
+    num: slide.slideNumber,
+    total: doc.slideCount,
+    ratio: doc.ratioLabel
+  });
   els.screenshotImg.classList.add('hidden');
   els.screenshotEmpty.classList.remove('hidden');
-  els.screenshotEmpty.textContent = `已直接解析 .pptx 底层 OOXML 数据（含 Theme 色板、母版装饰层、${slide.elements.length} 个图层对象），请切换到「布局结构」或「👁️ Sandbox 实时渲染预览」查看 1:1 效果`;
+  els.screenshotEmpty.textContent = tr('pptxDebugVisualHint', { count: slide.elements.length });
 
   const promptPkg = compilePptxPrompt(doc, { scope: 'single', slideIndex: slide.slideNumber - 1 });
   if (els.debugLayoutPre) {
     els.debugLayoutPre.textContent = promptPkg.userPrompt;
   }
-  els.debugHtmlPre.textContent = `// 本页共解析 ${slide.elements.length} 个对象\n` + JSON.stringify(
-    slide.elements.map((e) => ({ type: e.type, layer: e.fromLayer, name: e.name, box: e.box, text: e.text?.plainText })),
-    null,
-    2
-  );
+  els.debugHtmlPre.textContent =
+    tr('pptxDebugElementsComment', { count: slide.elements.length }) +
+    JSON.stringify(
+      slide.elements.map((e) => ({ type: e.type, layer: e.fromLayer, name: e.name, box: e.box, text: e.text?.plainText })),
+      null,
+      2
+    );
   els.debugCssPre.textContent = JSON.stringify({ theme: doc.theme, background: slide.background, transition: slide.transition }, null, 2);
   els.debugDeltaPre.textContent = JSON.stringify(
     slide.elements.filter((e) => e.animation).map((e) => ({ name: e.name, animation: e.animation })),
@@ -729,23 +793,27 @@ function renderPptxDebugPreview(slideIndex = 0) {
 async function handlePptxFile(file) {
   if (!file) return;
   if (!file.name.toLowerCase().endsWith('.pptx')) {
-    els.statusDetail.textContent = '⚠️ 请上传标准的 .pptx 格式文件';
+    els.statusDetail.textContent = tr('pptxOnlyPptxWarn');
     return;
   }
 
-  els.statusDetail.textContent = `⏳ 正在本地解析 ${file.name} (Theme / 母版 / 版式 / 图层)...`;
+  els.statusDetail.textContent = tr('pptxParsingStatus', { file: file.name });
   try {
     const buffer = await file.arrayBuffer();
     const pptxDoc = await parsePptxBuffer(buffer, { fileName: file.name });
     if (!pptxDoc.slides || pptxDoc.slides.length === 0) {
-      throw new Error('未在文件中解析到任何幻灯片页面');
+      throw new Error(tr('pptxNoSlidesErr'));
     }
 
     state.pptxDoc = pptxDoc;
     els.pptxDropZone?.classList.add('hidden');
     els.pptxLoadedCard?.classList.remove('hidden');
     if (els.pptxMetaText) {
-      els.pptxMetaText.textContent = `📽️ ${pptxDoc.fileName} (${pptxDoc.slideCount}页 · ${pptxDoc.ratioLabel})`;
+      els.pptxMetaText.textContent = tr('pptxMetaSummary', {
+        file: pptxDoc.fileName,
+        count: pptxDoc.slideCount,
+        ratio: pptxDoc.ratioLabel
+      });
     }
 
     if (els.pptxSlideSelect) {
@@ -753,7 +821,7 @@ async function handlePptxFile(file) {
       pptxDoc.slides.forEach((s, idx) => {
         const opt = document.createElement('option');
         opt.value = String(idx);
-        opt.textContent = `第 ${s.slideNumber} 页: ${s.title}`;
+        opt.textContent = tr('pptxSlideOption', { num: s.slideNumber, title: s.title });
         els.pptxSlideSelect.appendChild(opt);
       });
     }
@@ -761,10 +829,14 @@ async function handlePptxFile(file) {
     renderPptxDebugPreview(0);
     // 自动生成 1:1 HTML 演示稿并立即渲染到 Sandbox，同时生成首屏 Prompt
     generatePptxOutputs({ openSandbox: true });
-    els.statusDetail.textContent = `✅ 已高精度解析 ${file.name}（共 ${pptxDoc.slideCount} 页，${pptxDoc.ratioLabel}）`;
+    els.statusDetail.textContent = tr('pptxParsedOk', {
+      file: file.name,
+      count: pptxDoc.slideCount,
+      ratio: pptxDoc.ratioLabel
+    });
   } catch (err) {
     console.error('[WRI PPTX] 解析失败:', err);
-    els.statusDetail.textContent = `❌ PPTX 解析失败: ${err?.message || String(err)}`;
+    els.statusDetail.textContent = tr('pptxParseFail', { error: err?.message || String(err) });
   }
 }
 
@@ -789,7 +861,8 @@ function generatePptxOutputs({ openSandbox = false } = {}) {
 
   const htmlDeck = renderPptxToHtmlDeck(doc, {
     initialSlideIndex: scope === 'single' ? 0 : slideIndex,
-    onlySlideIndex: scope === 'single' ? slideIndex : null
+    onlySlideIndex: scope === 'single' ? slideIndex : null,
+    lang: state.config.lang
   });
   state.extractedHtmlCode = htmlDeck;
   updateSandboxPreview(htmlDeck);
@@ -807,7 +880,7 @@ async function sendPptxToSelectedAi() {
   const compiledPrompt = compilePptxPrompt(doc, { scope, slideIndex });
 
   switchOutputView('prompt');
-  els.statusDetail.textContent = `🤖 正在通过 ${state.config.channel} 生成 PPT 复刻代码...`;
+  els.statusDetail.textContent = tr('pptxSendingAi', { channel: state.config.channel });
 
   const res = await sendMessageSafe({
     type: 'DISPATCH_CUSTOM_PROMPT',
@@ -817,7 +890,7 @@ async function sendPptxToSelectedAi() {
   });
 
   if (res && !res.ok) {
-    els.statusDetail.textContent = `发送失败: ${res.error || '未知错误'}`;
+    els.statusDetail.textContent = tr('pptxSendAiFail', { error: res.error || 'Unknown error' });
   }
 }
 
@@ -860,17 +933,18 @@ function downloadPptxHtmlFile() {
     const { slideIndex, scope } = getPptxSelection();
     htmlDeck = renderPptxToHtmlDeck(state.pptxDoc, {
       initialSlideIndex: scope === 'single' ? 0 : slideIndex,
-      onlySlideIndex: scope === 'single' ? slideIndex : null
+      onlySlideIndex: scope === 'single' ? slideIndex : null,
+      lang: state.config.lang
     });
   }
   if (!htmlDeck) {
-    els.statusDetail.textContent = '⚠️ 当前没有可导出的 HTML 演示稿，请先上传 .pptx 或让 AI 生成 HTML 代码';
+    els.statusDetail.textContent = tr('pptxNoHtmlToExport');
     return;
   }
 
   const blob = new Blob([htmlDeck], { type: 'text/html;charset=utf-8' });
   triggerBlobDownload(blob, `${resolveExportBaseName()}.html`);
-  els.statusDetail.textContent = `✅ 已导出纯净单文件 HTML 演示稿 (${Math.round(blob.size / 1024)} KB)`;
+  els.statusDetail.textContent = tr('pptxHtmlExported', { kb: Math.max(1, Math.round(blob.size / 1024)) });
 }
 
 /**
@@ -881,20 +955,21 @@ async function exportCurrentSandboxToPptx() {
 
   const htmlCode = state.extractedHtmlCode || extractHtmlBlock(state.streamBuffer);
   if (!htmlCode) {
-    els.statusDetail.textContent = '⚠️ 请先在 Sandbox 生成并预览 HTML 演示稿，确认无误后再导出 .pptx';
-    els.sandboxStatusText.textContent = '暂无可转换的 HTML 演示稿';
+    els.statusDetail.textContent = tr('pptxNeedSandboxHtml');
+    els.sandboxStatusText.textContent = tr('pptxSandboxNoHtml');
     return;
   }
 
   state.isExportingPptx = true;
   const btns = [els.sandboxExportPptxBtn, els.pptxExportFileBtn].filter(Boolean);
-  const origLabels = btns.map((b) => b.innerHTML);
 
   try {
     btns.forEach((b) => { b.disabled = true; });
-    if (els.sandboxExportPptxBtn) els.sandboxExportPptxBtn.textContent = '⏳ 正在转换 .pptx...';
-    if (els.pptxExportFileBtn) els.pptxExportFileBtn.innerHTML = '<span>⏳ 正在测量真实排版并打包可编辑 .pptx...</span>';
-    els.statusDetail.textContent = '⏳ 正在逐页读取 Sandbox 真实排版坐标、富文本、渐变、表格与 2x 矢量图层...';
+    if (els.sandboxExportPptxBtn) els.sandboxExportPptxBtn.textContent = tr('pptxExportingBtn');
+    if (els.pptxExportFileBtn) {
+      els.pptxExportFileBtn.innerHTML = `<span>${tr('pptxExportingBanner')}</span>`;
+    }
+    els.statusDetail.textContent = tr('pptxExportingDetail');
 
     // 确保 Sandbox 处于可见状态且已挂载探针
     if (!els.sandboxPane.classList.contains('active')) {
@@ -922,29 +997,42 @@ async function exportCurrentSandboxToPptx() {
     const st = slidesModel.stats || {};
     const sizeKb = Math.max(1, Math.round(blob.size / 1024));
     const reportParts = [
-      `${summary.slideCount} 页`,
-      `${summary.textShapeCount} 文本框`,
-      `${Math.max(0, summary.shapeCount - summary.textShapeCount)} 形状`
+      tr('pptxStatSlides', { n: summary.slideCount }),
+      tr('pptxStatTextBoxes', { n: summary.textShapeCount }),
+      tr('pptxStatShapes', { n: Math.max(0, summary.shapeCount - summary.textShapeCount) })
     ];
-    if (summary.tableCount > 0) reportParts.push(`${summary.tableCount} 原生表格`);
-    if (summary.imageCount > 0) reportParts.push(`${summary.imageCount} 图片/2x矢量`);
-    if (summary.notesCount > 0) reportParts.push(`${summary.notesCount} 备注`);
+    if (summary.tableCount > 0) reportParts.push(tr('pptxStatTables', { n: summary.tableCount }));
+    if (summary.imageCount > 0) reportParts.push(tr('pptxStatMedia', { n: summary.imageCount }));
+    if (summary.notesCount > 0) reportParts.push(tr('pptxStatNotes', { n: summary.notesCount }));
 
-    const warnTip = Array.isArray(st.warnings) && st.warnings.length > 0 ? ` · 提示：${st.warnings[0]}` : '';
-    const msg = `✅ 已导出 ${fileName} (${sizeKb} KB · ${reportParts.join(' / ')})${warnTip}`;
-    els.statusDetail.textContent = msg;
-    els.sandboxStatusText.textContent = `✅ 已转换导出 ${summary.slideCount} 页可编辑 .pptx (${sizeKb} KB)`;
+    const warnTip =
+      Array.isArray(st.warnings) && st.warnings.length > 0
+        ? tr('pptxExportWarnPrefix', { warn: st.warnings[0] })
+        : '';
+    els.statusDetail.textContent = tr('pptxExportOkDetail', {
+      file: fileName,
+      kb: sizeKb,
+      stats: reportParts.join(' / '),
+      warn: warnTip
+    });
+    els.sandboxStatusText.textContent = tr('pptxExportOkSandbox', {
+      slides: summary.slideCount,
+      kb: sizeKb
+    });
   } catch (err) {
     console.error('[WRI PPTX Export] 转换失败:', err);
     const errMsg = err?.message || String(err);
-    els.statusDetail.textContent = `❌ 导出 .pptx 失败: ${errMsg}`;
-    els.sandboxStatusText.textContent = `❌ 转换失败: ${errMsg}`;
+    els.statusDetail.textContent = tr('pptxExportFailDetail', { error: errMsg });
+    els.sandboxStatusText.textContent = tr('pptxExportFailSandbox', { error: errMsg });
   } finally {
     state.isExportingPptx = false;
-    btns.forEach((b, i) => {
-      b.disabled = false;
-      b.innerHTML = origLabels[i];
-    });
+    btns.forEach((b) => { b.disabled = false; });
+    if (els.sandboxExportPptxBtn) {
+      els.sandboxExportPptxBtn.textContent = tr('sandboxExportPptxBtn');
+    }
+    if (els.pptxExportFileBtn) {
+      els.pptxExportFileBtn.innerHTML = `<span data-i18n="pptxExportBannerTitle">${tr('pptxExportBannerTitle')}</span><span class="export-pptx-badge" data-i18n="pptxExportBannerBadge">${tr('pptxExportBannerBadge')}</span>`;
+    }
   }
 }
 
@@ -952,6 +1040,12 @@ async function exportCurrentSandboxToPptx() {
  * 初始化所有 UI 交互事件
  */
 function bindEvents() {
+  els.langToggleBtn?.addEventListener('click', () => {
+    const nextLang = state.config.lang === 'en' ? 'zh' : 'en';
+    applyLanguage(nextLang, { refreshStatus: false });
+    saveConfigToStorage(false);
+  });
+
   els.themeToggleBtn.addEventListener('click', () => {
     const current = document.documentElement.getAttribute('data-theme') || 'dark';
     applyTheme(current === 'dark' ? 'light' : 'dark');
@@ -1105,12 +1199,12 @@ function bindEvents() {
   }
 
   els.copyPromptBtn.addEventListener('click', () => {
-    copyTextWithFeedback(state.streamBuffer, els.copyPromptBtn, '📋 一键复制 Prompt');
+    copyTextWithFeedback(state.streamBuffer, els.copyPromptBtn, 'copyPromptBtn');
   });
 
   els.copyCodeBtn.addEventListener('click', () => {
     const code = extractHtmlBlock(state.streamBuffer) || state.extractedHtmlCode;
-    copyTextWithFeedback(code, els.copyCodeBtn, '复制代码');
+    copyTextWithFeedback(code, els.copyCodeBtn, 'copyCodeBtn');
   });
 }
 

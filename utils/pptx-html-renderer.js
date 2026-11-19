@@ -313,9 +313,38 @@ function renderChartElement(el, themeColors) {
  */
 export function renderPptxToHtmlDeck(pptxDoc, options = {}) {
   const { stageW = 1280, stageH = 720, slides = [], fileName = 'Presentation' } = pptxDoc || {};
+  const isEn = String(options.lang || '').toLowerCase().startsWith('en');
   const onlyIdx = typeof options.onlySlideIndex === 'number' ? options.onlySlideIndex : null;
   const targetSlides = onlyIdx !== null && slides[onlyIdx] ? [slides[onlyIdx]] : slides;
   const initialIdx = Math.max(0, Math.min(targetSlides.length - 1, options.initialSlideIndex || 0));
+
+  const deckUi = isEn
+    ? {
+        htmlLang: 'en',
+        titleSuffix: '1:1 HTML Slide Deck',
+        prevTitle: 'Previous Slide (←)',
+        nextTitle: 'Next Slide (→)',
+        selectTitle: 'Jump to slide',
+        notesTitle: 'Speaker Notes',
+        notesLabel: '📝 Notes',
+        fsTitle: 'Fullscreen (F)',
+        fsLabel: '⛶ Fullscreen',
+        notesPrefix: 'Speaker Notes: ',
+        notesEmpty: 'No speaker notes on this slide'
+      }
+    : {
+        htmlLang: 'zh-CN',
+        titleSuffix: '1:1 HTML 演示稿',
+        prevTitle: '上一页 (←)',
+        nextTitle: '下一页 (→)',
+        selectTitle: '跳转幻灯片',
+        notesTitle: '演讲者备注',
+        notesLabel: '📝 备注',
+        fsTitle: '全屏演示 (F)',
+        fsLabel: '⛶ 全屏',
+        notesPrefix: '演讲者备注：',
+        notesEmpty: '本页无演讲者备注'
+      };
 
   let shapeUid = 0;
 
@@ -346,11 +375,11 @@ export function renderPptxToHtmlDeck(pptxDoc, options = {}) {
     .join('');
 
   return `<!DOCTYPE html>
-<html lang="zh-CN">
+<html lang="${deckUi.htmlLang}">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>${escHtml(fileName)} — 1:1 HTML 演示稿</title>
+<title>${escHtml(fileName)} — ${deckUi.titleSuffix}</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
   html, body {
@@ -477,16 +506,18 @@ export function renderPptxToHtmlDeck(pptxDoc, options = {}) {
   <div class="notes-drawer" id="notesDrawer"></div>
 
   <div class="deck-bar">
-    <button class="deck-btn" id="prevBtn" title="上一页 (←)">◀</button>
-    <select class="deck-select" id="slideSelect" title="跳转幻灯片">${slideOptionsHtml}</select>
-    <button class="deck-btn" id="nextBtn" title="下一页 (→)">▶</button>
-    <button class="deck-btn" id="notesBtn" title="演讲者备注">📝 备注</button>
-    <button class="deck-btn" id="fsBtn" title="全屏演示 (F)">⛶ 全屏</button>
+    <button class="deck-btn" id="prevBtn" title="${deckUi.prevTitle}">◀</button>
+    <select class="deck-select" id="slideSelect" title="${deckUi.selectTitle}">${slideOptionsHtml}</select>
+    <button class="deck-btn" id="nextBtn" title="${deckUi.nextTitle}">▶</button>
+    <button class="deck-btn" id="notesBtn" title="${deckUi.notesTitle}">${deckUi.notesLabel}</button>
+    <button class="deck-btn" id="fsBtn" title="${deckUi.fsTitle}">${deckUi.fsLabel}</button>
   </div>
 
   <script>
     const stageW = ${stageW};
     const stageH = ${stageH};
+    const notesPrefix = ${JSON.stringify(deckUi.notesPrefix)};
+    const notesEmpty = ${JSON.stringify(deckUi.notesEmpty)};
     const viewport = document.getElementById('deckViewport');
     const scaler = document.getElementById('stageScaler');
     const slides = Array.from(document.querySelectorAll('.ppt-slide'));
@@ -507,7 +538,7 @@ export function renderPptxToHtmlDeck(pptxDoc, options = {}) {
       slides.forEach((s, i) => s.classList.toggle('is-active', i === current));
       if (slideSelect) slideSelect.value = String(current);
       const notes = slides[current]?.dataset?.notes || '';
-      notesDrawer.textContent = notes ? '演讲者备注：' + notes : '本页无演讲者备注';
+      notesDrawer.textContent = notes ? notesPrefix + notes : notesEmpty;
     }
 
     document.getElementById('prevBtn').addEventListener('click', () => showSlide(current - 1));

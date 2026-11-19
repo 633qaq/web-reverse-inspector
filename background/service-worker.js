@@ -8,6 +8,7 @@ import { checkGeminiWebSession, streamGeminiWeb } from './router-web-gemini.js';
 import { streamByokGeneration } from './router-byok-api.js';
 import { compileReversePrompt } from '../utils/prompt-compiler.js';
 import { fetchCrossOriginKeyframes, filterComputedStyles } from '../utils/style-filter.js';
+import { t, normalizeLang } from '../utils/i18n.js';
 
 const STORAGE_KEY = 'wri_user_config_v1';
 let activeStreamAbortController = null;
@@ -352,12 +353,13 @@ async function composeStoryboardFromFrames(frames = []) {
 /**
  * 在活动网页中注入并启动双模态采集器
  */
-async function startContentCaptureInActiveTab(mode = 'hybrid') {
+async function startContentCaptureInActiveTab(mode = 'hybrid', lang = 'zh') {
+  const locale = normalizeLang(lang);
   const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
   const activeTab = tabs && tabs[0];
 
   if (!activeTab || !activeTab.id) {
-    return { ok: false, error: '未找到当前活动网页标签页' };
+    return { ok: false, error: t('swNoActiveTab', {}, locale) };
   }
 
   const url = activeTab.url || '';
@@ -371,7 +373,7 @@ async function startContentCaptureInActiveTab(mode = 'hybrid') {
     return {
       ok: false,
       restrictedPage: true,
-      error: '浏览器系统内部页不支持注入 DOM 吸管，已自动为您切换为内置 3D 全息卡片样本'
+      error: t('swRestrictedPage', {}, locale)
     };
   }
 
@@ -382,12 +384,13 @@ async function startContentCaptureInActiveTab(mode = 'hybrid') {
     });
 
     if (mode === 'cropper') {
-      const res = await sendTabMessageSafe(activeTab.id, { type: 'ACTIVATE_CROPPER' });
+      const res = await sendTabMessageSafe(activeTab.id, { type: 'ACTIVATE_CROPPER', lang: locale });
       return res.ok ? { ok: true, tabId: activeTab.id } : { ok: false, error: res.error };
     } else {
       const res = await sendTabMessageSafe(activeTab.id, {
         type: 'ACTIVATE_INSPECTOR',
-        mode
+        mode,
+        lang: locale
       });
       return res.ok ? { ok: true, tabId: activeTab.id } : { ok: false, error: res.error };
     }
@@ -395,7 +398,7 @@ async function startContentCaptureInActiveTab(mode = 'hybrid') {
     return {
       ok: false,
       restrictedPage: true,
-      error: `页面注入受限 (${err?.message || String(err)})`
+      error: t('swInjectRestricted', { error: err?.message || String(err) }, locale)
     };
   }
 }
@@ -740,14 +743,13 @@ async function streamTextDirectToSidePanel(fullText, controller) {
 /**
  * 本地高精度逆向编译器流式推送（通道提示发送至顶部状态栏，不污染 Prompt 正文）
  */
-async function streamOfflineFallbackToSidePanel(capturePayload, fallbackReason, controller) {
+async function streamOfflineFallbackToSidePanel(capturePayload, fallbackReason, controller, lang = 'zh') {
+  const locale = normalizeLang(lang);
   if (fallbackReason) {
-    const suspectHint = capturePayload?.screenshotSuspect
-      ? '；⚠️ 截图几乎是纯色，可能没拍到视频/画布画面，建议等画面加载后重新采集'
-      : '';
+    const suspectHint = capturePayload?.screenshotSuspect ? t('swFallbackSuspect', {}, locale) : '';
     await sendRuntimeMessageSafe({
       type: 'CHANNEL_FALLBACK_NOTICE',
-      notice: `未调用模型（${fallbackReason}）。下方是可直接发给 AI 的复刻 Prompt，请连同截图一起发送${suspectHint}`
+      notice: t('swFallbackNoticeWeb', { reason: fallbackReason, suspect: suspectHint }, locale)
     });
   }
 
@@ -766,6 +768,7 @@ async function dispatchCompiledPromptStream({ compiledPrompt, userConfig, mode =
   activeStreamAbortController = controller;
 
   const config = userConfig || (await getStoredUserConfig());
+  const locale = normalizeLang(config?.lang);
   const channel = config.channel || 'byok-gemini';
 
   await sendRuntimeMessageSafe({
@@ -787,13 +790,13 @@ async function dispatchCompiledPromptStream({ compiledPrompt, userConfig, mode =
 
   const runFallback = async (reason) => {
     if (capturePayload) {
-      await streamOfflineFallbackToSidePanel(capturePayload, reason, controller);
+      await streamOfflineFallbackToSidePanel(capturePayload, reason, controller, locale);
       return;
     }
     if (reason) {
       await sendRuntimeMessageSafe({
         type: 'CHANNEL_FALLBACK_NOTICE',
-        notice: `未调用模型（${reason}）。已输出纯净复刻 Prompt，可直接一键复制给外部 AI`
+        notice: t('swFallbackNoticeCustom', { reason }, locale)
       });
     }
     await streamTextDirectToSidePanel(fallbackText || compiledPrompt.combinedPromptForWeb || '', controller);
@@ -806,7 +809,7 @@ async function dispatchCompiledPromptStream({ compiledPrompt, userConfig, mode =
 
       if (!hasGeminiKey && !hasOpenAIKey) {
         const keyName = channel === 'byok-gemini' ? 'Google AI Studio Key' : 'OpenAI API Key';
-        await runFallback(`当前选择了 BYOK 通道但尚未配置 ${keyName}`);
+        await runFallback(t('swFallbackByokMissing', { keyName }, locale));
         return;
       }
 
@@ -872,7 +875,7 @@ async function dispatchCompiledPromptStream({ compiledPrompt, userConfig, mode =
     } else {
       await sendRuntimeMessageSafe({
         type: 'STREAM_CHUNK',
-        chunk: `\n\n> ⚠️ **流式传输中断**：${err?.message || String(err)}`
+        chunk: t('swStreamInterrupted', { error: err?.message || String(err) }, locale)
       });
       await sendRuntimeMessageSafe({ type: 'STREAM_DONE' });
     }
@@ -897,26 +900,29 @@ async function dispatchReverseStream(capturePayload, userConfig) {
  */
 async function evaluateChannelStatus(config = {}) {
   const channel = config.channel || 'byok-gemini';
+  const locale = normalizeLang(config.lang);
 
   if (channel === 'byok-gemini') {
     const hasKey = Boolean(config.geminiApiKey && config.geminiApiKey.trim().length > 8);
+    const model = config.geminiModel || 'gemini-4-argon';
     return {
       ready: hasKey,
-      badgeText: hasKey ? 'Gemini API 就绪' : '需配置 Gemini Key',
+      badgeText: hasKey ? t('swReadyByokGeminiBadge', {}, locale) : t('swNeedByokGeminiBadge', {}, locale),
       detail: hasKey
-        ? `已就绪：Google AI Studio (${config.geminiModel || 'gemini-4-argon'}) 多模态直连`
-        : '请点击右上角 ⚙️ 填入 Google AI Studio Key（未填将自动使用离线编译器）'
+        ? t('swReadyByokGeminiDetail', { model }, locale)
+        : t('swNeedByokGeminiDetail', {}, locale)
     };
   }
 
   if (channel === 'byok-openai') {
     const hasKey = Boolean(config.openaiApiKey && config.openaiApiKey.trim().length > 8);
+    const model = config.openaiModel || 'gpt-6.2-astra';
     return {
       ready: hasKey,
-      badgeText: hasKey ? 'OpenAI API 就绪' : '需配置 OpenAI Key',
+      badgeText: hasKey ? t('swReadyByokOpenaiBadge', {}, locale) : t('swNeedByokOpenaiBadge', {}, locale),
       detail: hasKey
-        ? `已就绪：OpenAI (${config.openaiModel || 'gpt-6.2-astra'}) 多模态直连`
-        : '请点击右上角 ⚙️ 填入 OpenAI API Key（未填将自动使用离线编译器）'
+        ? t('swReadyByokOpenaiDetail', { model }, locale)
+        : t('swNeedByokOpenaiDetail', {}, locale)
     };
   }
 
@@ -932,27 +938,27 @@ async function evaluateChannelStatus(config = {}) {
         if (sessionCheck.ok) {
           return {
             ready: true,
-            badgeText: 'ChatGPT Web 就绪',
-            detail: `当前模型: ${selectedChatgptModel} · ${sessionCheck.reason}`
+            badgeText: t('swChatgptWebReady', {}, locale),
+            detail: t('swModelDetail', { model: selectedChatgptModel, reason: sessionCheck.reason }, locale)
           };
         }
         return {
           ready: true,
-          badgeText: 'ChatGPT Cookie 就绪',
-          detail: `当前模型: ${selectedChatgptModel} · 检测到本地 chatgpt.com 登录态`
+          badgeText: t('swChatgptCookieReady', {}, locale),
+          detail: t('swChatgptCookieDetail', { model: selectedChatgptModel }, locale)
         };
       }
       return {
         ready: false,
-        badgeText: 'ChatGPT 需登录',
-        detail: `目标模型: ${selectedChatgptModel} · 未检测到 chatgpt.com 登录态，请先登录或切换 BYOK`
+        badgeText: t('swChatgptNeedLogin', {}, locale),
+        detail: t('swChatgptNeedLoginDetail', { model: selectedChatgptModel }, locale)
       };
     } catch (_err) {
       const fallback = await checkChatGPTWebSession();
       return {
         ready: Boolean(fallback.ok),
-        badgeText: fallback.ok ? 'ChatGPT Web 就绪' : 'ChatGPT 需登录',
-        detail: `当前模型: ${selectedChatgptModel} · ${fallback.reason}`
+        badgeText: fallback.ok ? t('swChatgptWebReady', {}, locale) : t('swChatgptNeedLogin', {}, locale),
+        detail: t('swModelDetail', { model: selectedChatgptModel, reason: fallback.reason }, locale)
       };
     }
   }
@@ -969,35 +975,35 @@ async function evaluateChannelStatus(config = {}) {
         if (geminiCheck.ok) {
           return {
             ready: true,
-            badgeText: 'Gemini Web 就绪',
-            detail: `当前模型: ${selectedGeminiModel} · ${geminiCheck.reason}`
+            badgeText: t('swGeminiWebReady', {}, locale),
+            detail: t('swModelDetail', { model: selectedGeminiModel, reason: geminiCheck.reason }, locale)
           };
         }
         return {
           ready: true,
-          badgeText: 'Gemini Cookie 就绪',
-          detail: `当前模型: ${selectedGeminiModel} · 检测到本地 Google 登录态`
+          badgeText: t('swGeminiCookieReady', {}, locale),
+          detail: t('swGeminiCookieDetail', { model: selectedGeminiModel }, locale)
         };
       }
       return {
         ready: false,
-        badgeText: 'Gemini 需登录',
-        detail: `目标模型: ${selectedGeminiModel} · 未检测到 gemini.google.com 登录态，请先登录或切换 BYOK`
+        badgeText: t('swGeminiNeedLogin', {}, locale),
+        detail: t('swGeminiNeedLoginDetail', { model: selectedGeminiModel }, locale)
       };
     } catch (_err) {
       const fallback = await checkGeminiWebSession();
       return {
         ready: Boolean(fallback.ok),
-        badgeText: fallback.ok ? 'Gemini Web 就绪' : 'Gemini 需登录',
-        detail: `当前模型: ${selectedGeminiModel} · ${fallback.reason}`
+        badgeText: fallback.ok ? t('swGeminiWebReady', {}, locale) : t('swGeminiNeedLogin', {}, locale),
+        detail: t('swModelDetail', { model: selectedGeminiModel, reason: fallback.reason }, locale)
       };
     }
   }
 
   return {
     ready: true,
-    badgeText: '就绪',
-    detail: '双模态采集与元提示词编译器已就绪'
+    badgeText: t('swDefaultReadyBadge', {}, locale),
+    detail: t('swDefaultReadyDetail', {}, locale)
   };
 }
 
@@ -1008,7 +1014,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   (async () => {
     try {
       if (!message || !message.type) {
-        sendResponse({ ok: false, error: '无效的消息格式' });
+        sendResponse({ ok: false, error: 'Invalid message format' });
         return;
       }
 
@@ -1021,7 +1027,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
         case 'START_PAGE_CAPTURE': {
           const mode = message.mode || 'hybrid';
-          const result = await startContentCaptureInActiveTab(mode);
+          const result = await startContentCaptureInActiveTab(mode, message.config?.lang);
           if (!result.ok && result.restrictedPage) {
             const mockCapture = await createMockCapturePayload(mode);
             sendResponse({

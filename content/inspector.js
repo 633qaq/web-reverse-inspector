@@ -177,7 +177,7 @@
     banner.innerHTML = `
       <span class="wri-dot"></span>
       <span id="wri-banner-text">🎯 吸管拾取已开启：悬停预览目标组件，左键点击抓取</span>
-      <span class="wri-kbd">Esc 取消</span>
+      <span id="wri-banner-kbd" class="wri-kbd">Esc 取消</span>
     `;
 
     highlightBox = document.createElement('div');
@@ -992,7 +992,7 @@
     const baseData = buildElementCaptureData(compositeTarget, modeAtClick);
 
     if (modeAtClick === 'recorder' && typeof window.__WRI_START_RECORDER__ === 'function') {
-      window.__WRI_START_RECORDER__(compositeTarget, baseData);
+      window.__WRI_START_RECORDER__(compositeTarget, baseData, window.__WRI_LANG__ || 'zh');
       return;
     }
 
@@ -1022,20 +1022,32 @@
     }
   }
 
-  function startInspector(mode = 'inspector') {
+  function startInspector(mode = 'inspector', lang = 'zh') {
     stopInspector();
     isInspecting = true;
     currentMode = mode;
+    const isEn = String(lang || '').toLowerCase().startsWith('en');
+    window.__WRI_LANG__ = isEn ? 'en' : 'zh';
     ensureShadowUI();
 
     const bannerTextEl = shadowRoot?.getElementById('wri-banner-text');
+    const bannerKbdEl = shadowRoot?.getElementById('wri-banner-kbd');
+    if (bannerKbdEl) {
+      bannerKbdEl.textContent = isEn ? 'Esc Cancel' : 'Esc 取消';
+    }
     if (bannerTextEl) {
       if (mode === 'recorder') {
-        bannerTextEl.textContent = '🎬 第一步：请点击要录制 2 秒动态交互（Hover/Scroll）的目标区域';
+        bannerTextEl.textContent = isEn
+          ? '🎬 Step 1: Click target area to start 4s motion storyboard recording (Hover / Scroll)'
+          : '🎬 第一步：请点击要录制 4 秒动态分镜（Hover / Scroll）的目标区域';
       } else if (mode === 'hybrid') {
-        bannerTextEl.textContent = '🔗 混合全量模式：请点击目标组件（自动提取复合图层 DOM + CSS + 局部截图）';
+        bannerTextEl.textContent = isEn
+          ? '🔗 Hybrid Mode: Click target component (auto-captures DOM + CSS + HD region crop)'
+          : '🔗 混合全量模式：请点击目标组件（自动提取复合图层 DOM + CSS + 局部截图）';
       } else {
-        bannerTextEl.textContent = '🎯 吸管拾取已开启：悬停预览目标组件，左键点击抓取';
+        bannerTextEl.textContent = isEn
+          ? '🎯 Inspector Active: Hover to preview, left-click to capture'
+          : '🎯 吸管拾取已开启：悬停预览目标组件，左键点击抓取';
       }
     }
 
@@ -1066,7 +1078,7 @@
     chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
       try {
         if (message?.type === 'ACTIVATE_INSPECTOR') {
-          window.__WRI_START_INSPECTOR__(message.mode || 'inspector');
+          window.__WRI_START_INSPECTOR__(message.mode || 'inspector', message.lang || 'zh');
           sendResponse({ ok: true });
           return true;
         }

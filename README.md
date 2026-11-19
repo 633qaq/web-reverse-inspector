@@ -4,7 +4,8 @@
 
 **纯客户端网页特效 / 界面全图层逆向 & PPTX 双向高保真复刻 Chrome 扩展（Manifest V3）**
 
-[![Version](https://img.shields.io/badge/version-v1.4.0-0ea5e9?style=flat-square)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v1.5.0-0ea5e9?style=flat-square)](./CHANGELOG.md)
+[![Bilingual UI](https://img.shields.io/badge/UI-%E4%B8%AD%E6%96%87%20%2F%20English-ec4899?style=flat-square)](#核心功能一览)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-10b981?style=flat-square)](#快速安装)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20(Vanilla%20ES%20Modules)-6366f1?style=flat-square)](#架构设计)
 [![License: MIT](https://img.shields.io/badge/License-MIT-f59e0b?style=flat-square)](./LICENSE)
@@ -49,6 +50,10 @@
 - **🔑 自备 API Key（BYOK）直连**：支持 Google AI Studio（Gemini API）与 OpenAI 官方 API 多模态 SSE 流式直连，密钥仅保存在本地 `chrome.storage.local`。
 - **📋 离线纯净回退**：未登录且未配 Key 时仍可无损产出完整结构化复刻 Prompt 与高清截图（一键复制截图 + 一键复制 Prompt）。
 
+### 4. 原生中英双语运行界面（简体中文 ⇄ English 一键热切换）
+- **🌍 自动匹配 + 一键切换**：首次安装自动跟随 Chrome 浏览器界面语言（同时内置 `_locales/en` 与 `_locales/zh_CN` 扩展清单多语言包），并可在侧边栏右上角点击 **`EN / 中文`** 按钮实时热切换并持久化。
+- **全链路覆盖**：完整覆盖侧边栏 UI、模型下拉选项、通道状态、错误/回退提示、目标网页 Shadow DOM 吸管/录制/框选横幅，以及 1:1 HTML 演示稿播放控制条。
+
 ---
 
 ## 🧭 工作流架构
@@ -71,7 +76,7 @@ flowchart LR
 本扩展为纯原生 ES Modules 工程，**无需 `npm install` 或构建打包**，30 秒即可加载运行：
 
 1. **获取源码**（二选一）：
-   - 前往 [Releases](https://github.com/633qaq/web-reverse-inspector/releases) 下载最新 `web-reverse-inspector-v1.4.0.zip` 并解压；
+   - 前往 [Releases](https://github.com/633qaq/web-reverse-inspector/releases) 下载最新 `web-reverse-inspector-v1.5.0.zip` 并解压；
    - 或直接克隆仓库：
      ```bash
      git clone https://github.com/633qaq/web-reverse-inspector.git
@@ -98,15 +103,16 @@ flowchart LR
 
 ```text
 web-reverse-inspector/
-├── manifest.json               # Chrome Manifest V3 清单 (v1.4.0)
+├── manifest.json               # Chrome Manifest V3 清单 (v1.5.0, 支持 _locales)
+├── _locales/                   # Chrome 原生清单双语包 (en / zh_CN)
 ├── README.md / README_EN.md    # 中英双语使用说明
 ├── CHANGELOG.md                # 中英双语版本发布记录
 ├── BRIEF.md                    # 实时工程蓝图与规格说明书
 ├── LICENSE                     # MIT 开源协议
-├── sidepanel/                  # 常驻侧边栏 UI（双模式工作台、调试 5 标签页、Sandbox 预览与导出）
-├── content/                    # Shadow DOM 注入采集器（inspector / recorder / cropper）
+├── sidepanel/                  # 常驻侧边栏 UI（中/英热切换、双模式工作台、调试 5 标签页、Sandbox 预览与导出）
+├── content/                    # Shadow DOM 注入采集器（双语横幅：inspector / recorder / cropper）
 ├── background/                 # Service Worker 消息总线、分镜拼接与双轨大模型路由
-└── utils/                      # 零依赖核心引擎（zip-lite / pptx-parser / pptx-html-renderer / html-slide-extractor / pptx-exporter / prompt-compiler / style-filter）
+└── utils/                      # 零依赖核心引擎（i18n / zip-lite / pptx-parser / pptx-html-renderer / html-slide-extractor / pptx-exporter / prompt-compiler / style-filter）
 ```
 
 ---

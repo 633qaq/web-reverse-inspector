@@ -31,8 +31,9 @@
   /**
    * 创建挂载在独立 Shadow DOM 中的顶部极细进度条与右上角录制角标（避免遮挡画面中央特效）
    */
-  function createRecorderBanner() {
+  function createRecorderBanner(lang = 'zh') {
     removeRecorderBanner();
+    const isEn = String(lang || window.__WRI_LANG__ || '').toLowerCase().startsWith('en');
 
     recorderShadowHost = document.createElement('div');
     recorderShadowHost.id = '__wri-recorder-shadow-host__';
@@ -98,9 +99,12 @@
     const pill = document.createElement('div');
     pill.id = 'wri-rec-pill';
     pill.className = 'wri-rec-pill';
+    const recText = isEn
+      ? '🎬 Recording 4-frame storyboard: move mouse & scroll'
+      : '🎬 正在抓拍 4 格动态分镜：请移动鼠标并滚动滚轮';
     pill.innerHTML = `
       <span class="wri-rec-dot"></span>
-      <span>🎬 正在抓拍 4 格动态分镜：请移动鼠标并滚动滚轮</span>
+      <span>${recText}</span>
       <span id="wri-rec-countdown" class="wri-rec-timer">4.0s</span>
     `;
 
@@ -230,13 +234,15 @@
   /**
    * 启动 4.0 秒动态交互录制 + 4 帧关键画面分镜抓拍
    */
-  function startInteractionRecording(targetEl, baseCaptureData = {}) {
+  function startInteractionRecording(targetEl, baseCaptureData = {}, lang = '') {
     if (!targetEl || isRecording) return;
     isRecording = true;
 
+    const activeLang = lang || window.__WRI_LANG__ || 'zh';
+    const isEn = String(activeLang).toLowerCase().startsWith('en');
     const durationMs = 4000;
     const startTime = performance.now();
-    createRecorderBanner();
+    createRecorderBanner(activeLang);
 
     // 通知后台清空上一次的分镜帧缓存
     try {
@@ -463,9 +469,15 @@
           extremes,
           inlineMutations,
           note: hasCssChange
-            ? '已捕获多节点样式/尺寸极值与 4 格动态分镜图'
+            ? isEn
+              ? 'Captured multi-node CSS/size deltas and 4-frame motion storyboard'
+              : '已捕获多节点样式/尺寸极值与 4 格动态分镜图'
             : canvasLayers.length > 0
-            ? '检测到全屏/大尺寸 Canvas 舞台：视觉特效由 WebGL / Shader 实时绘制驱动，请重点参照 2×2 四格动态分镜截图还原动画过程'
+            ? isEn
+              ? 'Detected large Canvas/WebGL stage: visual motion is shader/canvas driven; follow the 2×2 storyboard PNG to replicate'
+              : '检测到全屏/大尺寸 Canvas 舞台：视觉特效由 WebGL / Shader 实时绘制驱动，请重点参照 2×2 四格动态分镜截图还原动画过程'
+            : isEn
+            ? 'No significant CSS changes detected during the 4s recording'
             : '4 秒录制期间未检测到显著 CSS 变化'
         }
       };

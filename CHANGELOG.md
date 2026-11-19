@@ -6,21 +6,57 @@ All notable changes to **Web Reverse Inspector** are documented in this file (Bi
 
 ## [v1.5.0] - 2026-11-19
 
-### 🇨🇳 简体中文说明
-**全扩展中英双语运行界面上线：支持 Chrome 自动语言匹配与侧边栏右上角一键实时热切换（简体中文 ⇄ English）。**
+**对比链接 / Full Changelog**：[`v1.4.0...v1.5.0`](https://github.com/633qaq/web-reverse-inspector/compare/v1.4.0...v1.5.0)
 
-- **新增**：Chrome 扩展清单原生国际化（`_locales/en/messages.json`、`_locales/zh_CN/messages.json`，`manifest.json` 升级至 `1.5.0` 并配置 `default_locale: "en"`），Chrome 扩展管理页与工具栏提示按浏览器语言自动显示中文或英文。
-- **新增**：零依赖统一双语词典与热切换引擎（`utils/i18n.js`，185 组严格对称中英词条，含浏览器语言自动探测与 `{var}` 插值校验）。
-- **新增**：侧边栏右上角新增 **`EN / 中文`** 切换按钮，点击后毫秒级热更新全界面文案、模型菜单、PPTX 页码选择、Sandbox 提示与通道状态，并持久化至 `chrome.storage.local`。
-- **升级**：目标网页注入的 Shadow DOM 提示横幅（`inspector.js` / `recorder.js` / `cropper.js`）、后台通道状态与回退通知（`service-worker.js`）以及 1:1 HTML 演示稿底部控制条（`pptx-html-renderer.js`）全部支持中英双语联动（并顺手修正 `inspector.js` 录制横幅中一处 `2 秒` 旧文案为 `4 秒`）。
+### 🇨🇳 简体中文版本更新内容
+**核心主题：全扩展中英双语运行界面正式上线（简体中文 ⇄ English 实时热切换 + Chrome 自动语言匹配）。**
+
+#### ✨ 新增功能 (Added)
+- **Chrome 原生扩展清单多语言包**：新增 `_locales/en/messages.json` 与 `_locales/zh_CN/messages.json`，升级 `manifest.json` 至 `1.5.0` 并配置 `default_locale: "en"`，Chrome 扩展管理页名称、简介与工具栏悬停提示随浏览器语言自动切换。
+- **零依赖统一双语词典与 DOM 热切换引擎（`utils/i18n.js`）**：内置 **185 组** 严格对称的中英词条，首次启动自动检测 `chrome.i18n.getUILanguage()` / `navigator.language`，支持 `{var}` 模板插值与批量 `data-i18n*` 毫秒级无刷新切换。
+- **侧边栏一键语言切换按钮**：在侧边栏右上角（`🌓` 主题切换左侧）新增 **`EN / 中文`** 切换按钮，点击后即时刷新全界面并持久化至 `chrome.storage.local`。
+
+#### 🔧 改进与联动 (Improved)
+- **SidePanel 全量动态文案双语化**（`sidepanel/index.html`、`sidepanel.css`、`sidepanel.js`）：覆盖通道选择器、模型下拉菜单、PPTX 页码/范围下拉框、调试 5 标签页、剪贴板按钮反馈、Sandbox 提示页以及 `.pptx` 导出统计报告。
+- **后台服务与网页注入层双语联动**：
+  - `background/service-worker.js`：顶部通道连通徽标、详情提示、受限页提示、BYOK 缺 Key 与离线回退通知按当前语言实时返回；
+  - `content/inspector.js` / `content/recorder.js` / `content/cropper.js`：注入目标网页的独立 Shadow DOM 吸管横幅、4 秒动态分镜录制角标、十字准星框选横幅及 `Esc` 取消提示全面支持中英文；
+  - `utils/pptx-html-renderer.js`：生成的 1:1 单文件 HTML5 演示稿底部翻页条、演讲者备注抽屉与全屏按钮自动适配中英文界面。
+- **双语文档同步**：同步更新 `README.md`、`README_EN.md` 与工程蓝图 `BRIEF.md`。
+
+#### 🐛 修复 (Fixed)
+- 修正 `content/inspector.js` 在录制模式第一步提示横幅中残留的一处旧文案（“录制 2 秒”修正为准确的“录制 4 秒 / 4s motion storyboard”）。
+
+#### ✅ 校验结果 (Verification)
+- 全项目 16 个 `.js` 文件 `node --check` 语法校验通过；
+- 185 组中英 Key 与全部 `{var}` 占位符 100% 匹配，84 处 HTML `data-i18n*` 与 123 处 JS 翻译调用零遗漏；
+- Batch 5（PPTX 解析 10 项）与 Batch 6（HTML→PPTX 往返闭环 43 项）回归测试全部通过。
+
+---
 
 ### 🇺🇸 English Release Notes
-**Full Bilingual Runtime UI: Auto-detects Chrome language with an instant top-bar `EN / 中文` live toggle.**
+**Headline: Full Bilingual Runtime UI (English ⇄ 简体中文 instant live switch with automatic Chrome locale detection).**
 
-- **Added**: Native Chrome manifest localization (`_locales/en/messages.json` and `_locales/zh_CN/messages.json`; bumped `manifest.json` to `1.5.0` with `default_locale: "en"`).
-- **Added**: Zero-dependency bilingual dictionary & live DOM i18n engine (`utils/i18n.js`, 185 strictly matched ZH/EN keys with browser language auto-detection).
-- **Added**: Top-right **`EN / 中文`** toggle button in the SidePanel for instant zero-reload language switching persisted to `chrome.storage.local`.
-- **Improved**: Full bilingual support across injected Shadow DOM capture banners (`inspector.js`, `recorder.js`, `cropper.js`), Service Worker channel status/fallback messages (`service-worker.js`), and 1:1 HTML slide deck player controls (`pptx-html-renderer.js`).
+#### ✨ Added
+- **Native Chrome Manifest Localization**: Added `_locales/en/messages.json` and `_locales/zh_CN/messages.json`, bumped `manifest.json` to `1.5.0` with `default_locale: "en"` so extension name, description, and toolbar tooltip follow Chrome's UI language automatically.
+- **Zero-Dependency Bilingual i18n Engine (`utils/i18n.js`)**: Ships **185 strictly matched** EN/ZH keys with automatic browser locale detection, placeholder interpolation, and instant `data-i18n*` live DOM updates.
+- **Top-Bar Live Language Switcher**: Added an **`EN / 中文`** toggle button next to the theme switch in the SidePanel header; preference persists in `chrome.storage.local`.
+
+#### 🔧 Improved
+- **Full SidePanel Bilingual Coverage** (`sidepanel/index.html`, `sidepanel.css`, `sidepanel.js`): Localized channels, model selectors, PPTX slide/scope controls, 5 debug tabs, clipboard toasts, Sandbox placeholders, and `.pptx` export summaries.
+- **End-to-End Runtime Propagation**:
+  - `background/service-worker.js`: Channel readiness badges, fallback notices, and restricted-page messages dynamically follow active language;
+  - `content/inspector.js`, `content/recorder.js`, `content/cropper.js`: Injected Shadow DOM banners (inspector, 4s storyboard recorder pill, crosshair cropper, `Esc` hints) switch cleanly between English and Chinese;
+  - `utils/pptx-html-renderer.js`: Generated 1:1 HTML5 slide deck player controls (Notes, Fullscreen, Prev/Next) adapt automatically to the selected language.
+- **Docs Synced**: Updated `README.md`, `README_EN.md`, and `BRIEF.md`.
+
+#### 🐛 Fixed
+- Fixed a stale "2s" label in the `content/inspector.js` recorder step-1 banner to accurately read "4s".
+
+#### ✅ Verification
+- All 16 `.js` modules passed `node --check`;
+- Verified 100% EN/ZH key parity (185 keys), placeholder parity, 84 HTML `data-i18n*` attributes, and 123 JS translation calls;
+- Passed all Batch 5 PPTX parsing tests (10/10) and Batch 6 HTML→PPTX round-trip assertions (43/43).
 
 ---
 

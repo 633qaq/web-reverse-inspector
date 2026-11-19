@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "Web Reverse Inspector (网页逆向 & PPTX 双向复刻引擎)",
+  "version": "1.4.0",
+  "description": "纯客户端网页特效/全图层布局/4秒动态分镜逆向工具，内置零依赖 OOXML 引擎，支持 .pptx 95%+ 复刻、1:1 HTML 演示稿预览与高保真可编辑 .pptx 一键转换导出。",
+  "permissions": [
+    "sidePanel",
+    "scripting",
+    "cookies",
+    "activeTab",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "打开 Web Reverse Inspector 侧边栏"
+  },
+  "side_panel": {
+    "default_path": "sidepanel/index.html"
+  }
+}

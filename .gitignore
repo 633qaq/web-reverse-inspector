@@ -1,0 +1,21 @@
+# OS & Editor
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+.vscode/
+.idea/
+
+# Packaging & Release artifacts
+dist/
+release/
+*.zip
+*.crx
+*.pem
+
+# Logs & Dependencies
+*.log
+node_modules/
+.env
+.env.local

@@ -273,35 +273,140 @@ function renderChartElement(el, themeColors) {
     themeColors?.accent2 || '#f43f5e',
     themeColors?.accent3 || '#10b981',
     themeColors?.accent4 || '#a855f7',
-    themeColors?.accent5 || '#f59e0b'
+    themeColors?.accent5 || '#f59e0b',
+    themeColors?.accent6 || '#06b6d4'
   ];
 
-  const ser0 = chart?.series?.[0];
+  const kind = String(chart?.chartKind || 'barChart').toLowerCase();
+  const seriesList = Array.isArray(chart?.series) && chart.series.length ? chart.series : [{ name: 'Series 1', categories: ['A', 'B', 'C', 'D'], values: [42, 68, 54, 86] }];
+  const ser0 = seriesList[0];
   const vals = ser0?.values?.length ? ser0.values : [42, 68, 54, 86];
   const cats = ser0?.categories?.length ? ser0.categories : vals.map((_, i) => `项 ${i + 1}`);
-  const maxVal = Math.max(...vals.map((v) => Math.abs(v)), 1);
+  let svgInner = '';
+  let svgW = 340;
+  let svgH = 180;
 
-  const barW = Math.max(14, Math.floor(260 / Math.max(1, vals.length)));
-  const gap = 14;
-  const svgW = Math.max(320, vals.length * (barW + gap) + 40);
-  const svgH = 180;
+  if (kind.includes('pie') || kind.includes('doughnut')) {
+    // 原生 SVG 饼图 / 环形图
+    const total = vals.reduce((acc, v) => acc + Math.max(0, Number(v) || 0), 0) || 1;
+    const cx = 96;
+    const cy = 90;
+    const r = 68;
+    const isDoughnut = kind.includes('doughnut');
+    let startAngle = -Math.PI / 2;
+    const slices = [];
+    const legends = [];
 
-  const barsSvg = vals
-    .map((v, i) => {
-      const h = Math.max(6, Math.round((Math.abs(v) / maxVal) * 120));
-      const x = 24 + i * (barW + gap);
-      const y = 140 - h;
+    vals.forEach((rawV, i) => {
+      const v = Math.max(0, Number(rawV) || 0);
+      const frac = v / total;
+      const sweep = Math.max(0.001, frac * Math.PI * 2);
+      const endAngle = startAngle + sweep;
+      const x1 = cx + r * Math.cos(startAngle);
+      const y1 = cy + r * Math.sin(startAngle);
+      const x2 = cx + r * Math.cos(endAngle);
+      const y2 = cy + r * Math.sin(endAngle);
+      const largeArc = sweep > Math.PI ? 1 : 0;
       const col = palette[i % palette.length];
-      const label = String(cats[i] || '').slice(0, 8);
-      return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="4" fill="${escHtml(col)}"/>
-        <text x="${x + barW / 2}" y="${y - 6}" font-size="11" fill="#64748b" text-anchor="middle">${v}</text>
-        <text x="${x + barW / 2}" y="162" font-size="10" fill="#64748b" text-anchor="middle">${escHtml(label)}</text>`;
-    })
-    .join('');
+      if (frac >= 0.999) {
+        slices.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${escHtml(col)}"/>`);
+      } else {
+        slices.push(
+          `<path d="M ${cx} ${cy} L ${x1.toFixed(1)} ${y1.toFixed(1)} A ${r} ${r} 0 ${largeArc} 1 ${x2.toFixed(1)} ${y2.toFixed(1)} Z" fill="${escHtml(col)}" stroke="#ffffff" stroke-width="1.2"/>`
+        );
+      }
+      const ly = 24 + i * 24;
+      if (ly < svgH - 8) {
+        const lbl = String(cats[i] || `#${i + 1}`).slice(0, 10);
+        const pct = Math.round(frac * 100);
+        legends.push(
+          `<rect x="190" y="${ly - 9}" width="10" height="10" rx="2" fill="${escHtml(col)}"/><text x="206" y="${ly}" font-size="11" fill="#475569">${escHtml(lbl)} (${pct}%)</text>`
+        );
+      }
+      startAngle = endAngle;
+    });
+
+    const hole = isDoughnut ? `<circle cx="${cx}" cy="${cy}" r="34" fill="#ffffff"/>` : '';
+    svgInner = `${slices.join('')}${hole}${legends.join('')}`;
+  } else if (kind.includes('line') || kind.includes('area')) {
+    // 原生 SVG 折线图 / 面积图（支持多系列）
+    const allVals = seriesList.flatMap((s) => (s.values || []).map((v) => Number(v) || 0));
+    const maxVal = Math.max(...allVals, 1);
+    const minVal = Math.min(...allVals, 0);
+    const span = Math.max(1, maxVal - minVal);
+    const padL = 32;
+    const padR = 20;
+    const padT = 22;
+    const padB = 34;
+    const plotW = svgW - padL - padR;
+    const plotH = svgH - padT - padB;
+    const count = Math.max(2, vals.length);
+
+    const gridLines = [0, 0.5, 1]
+      .map((t) => {
+        const y = padT + plotH * (1 - t);
+        return `<line x1="${padL}" y1="${y.toFixed(1)}" x2="${svgW - padR}" y2="${y.toFixed(1)}" stroke="rgba(148,163,184,0.25)" stroke-dasharray="3,3"/>`;
+      })
+      .join('');
+
+    const seriesSvg = seriesList
+      .slice(0, 4)
+      .map((ser, sIdx) => {
+        const sVals = ser.values?.length ? ser.values : vals;
+        const col = palette[sIdx % palette.length];
+        const pts = sVals.map((v, i) => {
+          const x = padL + (plotW * i) / Math.max(1, count - 1);
+          const y = padT + plotH * (1 - ((Number(v) || 0) - minVal) / span);
+          return { x, y, v };
+        });
+        const poly = pts.map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`).join(' ');
+        const areaPath =
+          kind.includes('area') && pts.length >= 2
+            ? `<polygon points="${padL},${padT + plotH} ${poly} ${pts[pts.length - 1].x.toFixed(1)},${padT + plotH}" fill="${escHtml(col)}" opacity="0.18"/>`
+            : '';
+        const dots = pts
+          .map(
+            (p) =>
+              `<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="3.5" fill="${escHtml(col)}" stroke="#ffffff" stroke-width="1.2"/>` +
+              (sIdx === 0 ? `<text x="${p.x.toFixed(1)}" y="${(p.y - 7).toFixed(1)}" font-size="10" fill="#64748b" text-anchor="middle">${p.v}</text>` : '')
+          )
+          .join('');
+        return `${areaPath}<polyline points="${poly}" fill="none" stroke="${escHtml(col)}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
+      })
+      .join('');
+
+    const xLabels = cats
+      .slice(0, count)
+      .map((c, i) => {
+        const x = padL + (plotW * i) / Math.max(1, count - 1);
+        return `<text x="${x.toFixed(1)}" y="${svgH - 12}" font-size="10" fill="#64748b" text-anchor="middle">${escHtml(String(c || '').slice(0, 8))}</text>`;
+      })
+      .join('');
+
+    svgInner = `${gridLines}${seriesSvg}${xLabels}`;
+  } else {
+    // 默认柱状图
+    const maxVal = Math.max(...vals.map((v) => Math.abs(v)), 1);
+    const barW = Math.max(14, Math.floor(260 / Math.max(1, vals.length)));
+    const gap = 14;
+    svgW = Math.max(320, vals.length * (barW + gap) + 40);
+    svgInner = vals
+      .map((v, i) => {
+        const h = Math.max(6, Math.round((Math.abs(v) / maxVal) * 120));
+        const x = 24 + i * (barW + gap);
+        const y = 140 - h;
+        const col = palette[i % palette.length];
+        const label = String(cats[i] || '').slice(0, 8);
+        return `<rect x="${x}" y="${y}" width="${barW}" height="${h}" rx="4" fill="${escHtml(col)}"/>
+          <text x="${x + barW / 2}" y="${y - 6}" font-size="11" fill="#64748b" text-anchor="middle">${v}</text>
+          <text x="${x + barW / 2}" y="162" font-size="10" fill="#64748b" text-anchor="middle">${escHtml(label)}</text>`;
+      })
+      .join('');
+  }
 
   return `<div class="ppt-el" style="left:${box.xPx}px;top:${box.yPx}px;width:${box.wPx}px;height:${box.hPx}px;background:rgba(255,255,255,0.04);border:1px solid rgba(148,163,184,0.28);border-radius:8px;padding:12px;display:flex;flex-direction:column;">
     <div style="font-size:14px;font-weight:700;margin-bottom:6px;color:#334155;">${escHtml(chart?.title || el.name || 'Chart')}</div>
-    <svg viewBox="0 0 ${svgW} ${svgH}" style="flex:1;width:100%;height:100%;">${barsSvg}</svg>
+    <svg viewBox="0 0 ${svgW} ${svgH}" style="flex:1;width:100%;height:100%;">${svgInner}</svg>
   </div>`;
 }
 

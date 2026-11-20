@@ -11,6 +11,10 @@
 
 export const PROBE_REQ_TYPE = 'WRI_EXPORT_SLIDES_REQ';
 export const PROBE_RES_TYPE = 'WRI_EXPORT_SLIDES_RES';
+export const EDIT_MODE_REQ_TYPE = 'WRI_EDIT_MODE_REQ';
+export const EDIT_MODE_RES_TYPE = 'WRI_EDIT_MODE_RES';
+export const CLEAN_HTML_REQ_TYPE = 'WRI_CLEAN_HTML_REQ';
+export const CLEAN_HTML_RES_TYPE = 'WRI_CLEAN_HTML_RES';
 const PROBE_MARKER = '/* __WRI_SANDBOX_EXPORT_PROBE__ */';
 
 /**
@@ -26,6 +30,11 @@ ${PROBE_MARKER}
 
   var REQ_TYPE = '${PROBE_REQ_TYPE}';
   var RES_TYPE = '${PROBE_RES_TYPE}';
+  var EDIT_REQ = '${EDIT_MODE_REQ_TYPE}';
+  var EDIT_RES = '${EDIT_MODE_RES_TYPE}';
+  var CLEAN_REQ = '${CLEAN_HTML_REQ_TYPE}';
+  var CLEAN_RES = '${CLEAN_HTML_RES_TYPE}';
+  var isEditModeActive = false;
 
   // -------- 通用 CSS 解析工具 --------
 
@@ -1202,13 +1211,40 @@ ${PROBE_MARKER}
         }
       }
 
-      // 6. 原子文本 / 带底色文字卡片（一步合并提取，彻底防文字重影）
+      // 6. 原子文本 / 带底色文字卡片（一步合并提取，彻底防文字重影；在 hybrid 模式下将含特效底板 2x 透明光栅化 + 叠放可编辑文字）
       if (el !== slideEl && isAtomicTextContainer(el)) {
         var fill = extractFillFromStyle(cs);
         var stroke = extractStrokeFromStyle(cs);
         var shadow = parseBoxShadow(cs.boxShadow);
         var geom = extractGeometryFromStyle(cs, box);
         var bgImgUrl = extractCssBgUrl(cs.backgroundImage);
+        var hasSpecialWebFx =
+          (cs.backdropFilter && cs.backdropFilter !== 'none') ||
+          (cs.filter && cs.filter !== 'none') ||
+          (cs.clipPath && cs.clipPath !== 'none');
+
+        var useHybridRasterSurface =
+          options.exportMode === 'hybrid' &&
+          hasSpecialWebFx &&
+          (fill.kind !== 'none' || stroke || shadow);
+
+        if (useHybridRasterSurface) {
+          var hybridPng = await rasterizeStylizedSurfaceToPng(el, box, ctx.rasterScale);
+          if (hybridPng) {
+            pushElement({
+              type: 'image',
+              sourceKind: 'hybrid-surface',
+              name: 'Hybrid FX Surface',
+              box: box,
+              dataUrl: hybridPng,
+              opacity: 1
+            });
+            stats.imageCount++;
+            fill = { kind: 'none' };
+            stroke = null;
+            shadow = null;
+          }
+        }
 
         // 若带背景图，先放底层图片
         if (bgImgUrl) {
@@ -1614,18 +1650,153 @@ ${PROBE_MARKER}
     });
   }
 
+  // -------- 混合保真装饰层 2x 光栅化工具 --------
+  async function rasterizeStylizedSurfaceToPng(el, box, rasterScale) {
+    try {
+      var cs = window.getComputedStyle(el);
+      var w = Math.max(2, Math.round(box.wPx));
+      var h = Math.max(2, Math.round(box.hPx));
+      var scale = Math.min(2.5, Math.max(1.5, rasterScale || 2));
+      var styleCss = [
+        'width:' + w + 'px',
+        'height:' + h + 'px',
+        'box-sizing:border-box',
+        'background:' + (cs.backgroundImage && cs.backgroundImage !== 'none' ? cs.backgroundImage : cs.backgroundColor),
+        'border:' + cs.border,
+        'border-radius:' + cs.borderRadius,
+        'box-shadow:' + cs.boxShadow,
+        cs.filter && cs.filter !== 'none' ? 'filter:' + cs.filter : '',
+        cs.clipPath && cs.clipPath !== 'none' ? 'clip-path:' + cs.clipPath : '',
+        'opacity:' + (cs.opacity || '1')
+      ].filter(Boolean).join(';');
+
+      var svgXml =
+        '<svg xmlns="http://www.w3.org/2000/svg" width="' + w + '" height="' + h + '">' +
+        '<foreignObject width="100%" height="100%">' +
+        '<div xmlns="http://www.w3.org/1999/xhtml" style="' + styleCss.replace(/"/g, '&quot;') + '"></div>' +
+        '</foreignObject></svg>';
+
+      var dataUrl = 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svgXml);
+      var img = await loadImageSafe(dataUrl, 2200);
+      if (!img) return null;
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.min(2400, Math.round(w * scale));
+      canvas.height = Math.min(2400, Math.round(h * scale));
+      var ctx = canvas.getContext('2d');
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      return canvas.toDataURL('image/png');
+    } catch (_e) {
+      return null;
+    }
+  }
+
+  // -------- Sandbox 在线改字 (contenteditable) 控制 --------
+  function setSandboxEditMode(enabled) {
+    isEditModeActive = Boolean(enabled);
+    var styleId = '__wri_edit_mode_style__';
+    var existingStyle = document.getElementById(styleId);
+    var nodes = Array.from(document.querySelectorAll('[data-wri-editable="1"]'));
+    nodes.forEach(function (n) {
+      n.removeAttribute('contenteditable');
+      n.removeAttribute('spellcheck');
+      n.removeAttribute('data-wri-editable');
+    });
+    if (!isEditModeActive) {
+      if (existingStyle) existingStyle.remove();
+      return { enabled: false, count: 0 };
+    }
+
+    if (!existingStyle) {
+      var st = document.createElement('style');
+      st.id = styleId;
+      st.setAttribute('data-wri-ignore', '1');
+      st.textContent =
+        '[data-wri-editable="1"] { outline: 1px dashed rgba(56, 189, 248, 0.55) !important; outline-offset: 2px; cursor: text !important; }' +
+        '[data-wri-editable="1"]:focus { outline: 2px solid #38bdf8 !important; background: rgba(56, 189, 248, 0.12) !important; border-radius: 4px; }';
+      document.head.appendChild(st);
+    }
+
+    var count = 0;
+    var slideNodes = detectSlideNodes();
+    slideNodes.forEach(function (slide) {
+      var candidates = Array.from(slide.querySelectorAll('*'));
+      candidates.forEach(function (el) {
+        if (isIgnoredControlEl(el, slide)) return;
+        if (el.closest('svg, table, button.deck-btn, .deck-bar, .notes-drawer')) return;
+        if (isAtomicTextContainer(el)) {
+          // 跳过已由祖先设为可编辑的节点
+          if (el.parentElement && el.parentElement.closest('[data-wri-editable="1"]')) return;
+          el.setAttribute('contenteditable', 'true');
+          el.setAttribute('spellcheck', 'false');
+          el.setAttribute('data-wri-editable', '1');
+          count++;
+        }
+      });
+    });
+    return { enabled: true, count: count };
+  }
+
+  function extractCleanHtmlString() {
+    var cloneDoc = document.documentElement.cloneNode(true);
+    // 移除编辑样式、冻结样式与探针 script
+    cloneDoc.querySelectorAll('#__wri_edit_mode_style__, #__wri_export_freeze__').forEach(function (n) {
+      n.remove();
+    });
+    cloneDoc.querySelectorAll('[data-wri-editable]').forEach(function (n) {
+      n.removeAttribute('contenteditable');
+      n.removeAttribute('spellcheck');
+      n.removeAttribute('data-wri-editable');
+    });
+    cloneDoc.querySelectorAll('script').forEach(function (s) {
+      if ((s.textContent || '').indexOf('__WRI_SANDBOX_EXPORT_PROBE__') >= 0) {
+        s.remove();
+      }
+    });
+    return '<!DOCTYPE html>\\n' + cloneDoc.outerHTML;
+  }
+
   // -------- postMessage 指令监听 --------
   window.addEventListener('message', function (event) {
     var data = event && event.data;
-    if (!data || data.type !== REQ_TYPE) return;
+    if (!data || !data.type) return;
     var reqId = data.requestId;
+
+    if (data.type === EDIT_REQ) {
+      try {
+        var editRes = setSandboxEditMode(Boolean(data.enabled));
+        window.parent.postMessage({ type: EDIT_RES, requestId: reqId, ok: true, result: editRes }, '*');
+      } catch (eEdit) {
+        window.parent.postMessage({ type: EDIT_RES, requestId: reqId, ok: false, error: String(eEdit) }, '*');
+      }
+      return;
+    }
+
+    if (data.type === CLEAN_REQ) {
+      try {
+        var cleanHtml = extractCleanHtmlString();
+        window.parent.postMessage({ type: CLEAN_RES, requestId: reqId, ok: true, html: cleanHtml }, '*');
+      } catch (eClean) {
+        window.parent.postMessage({ type: CLEAN_RES, requestId: reqId, ok: false, error: String(eClean) }, '*');
+      }
+      return;
+    }
+
+    if (data.type !== REQ_TYPE) return;
+
+    var wasEditing = isEditModeActive;
+    if (wasEditing) {
+      setSandboxEditMode(false);
+    }
 
     Promise.resolve()
       .then(function () { return captureAllSlides(data.options || {}); })
       .then(function (model) {
+        if (wasEditing) setSandboxEditMode(true);
         window.parent.postMessage({ type: RES_TYPE, requestId: reqId, ok: true, model: model }, '*');
       })
       .catch(function (err) {
+        if (wasEditing) setSandboxEditMode(true);
         window.parent.postMessage(
           { type: RES_TYPE, requestId: reqId, ok: false, error: (err && err.message) || String(err) },
           '*'
@@ -1714,7 +1885,8 @@ export function requestSlidesSnapshotFromSandbox(iframeEl, options = {}) {
           options: {
             targetStageW: options.targetStageW || 1280,
             targetStageH: options.targetStageH || 720,
-            rasterScale: options.rasterScale || 2
+            rasterScale: options.rasterScale || 2,
+            exportMode: options.exportMode === 'hybrid' ? 'hybrid' : 'native'
           }
         },
         '*'
@@ -1723,6 +1895,90 @@ export function requestSlidesSnapshotFromSandbox(iframeEl, options = {}) {
       settled = true;
       cleanup();
       reject(new Error(`无法向 Sandbox 发送转换指令: ${err?.message || String(err)}`));
+    }
+  });
+}
+
+/**
+ * 切换 Sandbox 在线直接编辑文字模式 (contenteditable)
+ */
+export function toggleSandboxEditMode(iframeEl, enabled = false, timeoutMs = 4000) {
+  return new Promise((resolve, reject) => {
+    if (!iframeEl || !iframeEl.contentWindow) {
+      reject(new Error('Sandbox not mounted'));
+      return;
+    }
+    const requestId = `wri_edit_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    let settled = false;
+    const cleanup = () => {
+      window.removeEventListener('message', onMessage);
+      clearTimeout(timer);
+    };
+    const onMessage = (event) => {
+      if (settled || event.source !== iframeEl.contentWindow) return;
+      const data = event.data;
+      if (!data || data.type !== EDIT_MODE_RES_TYPE || data.requestId !== requestId) return;
+      settled = true;
+      cleanup();
+      if (data.ok) resolve(data.result || { enabled: Boolean(enabled), count: 0 });
+      else reject(new Error(data.error || 'Toggle edit mode failed'));
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('Edit mode toggle timeout'));
+    }, timeoutMs);
+
+    window.addEventListener('message', onMessage);
+    try {
+      iframeEl.contentWindow.postMessage({ type: EDIT_MODE_REQ_TYPE, requestId, enabled: Boolean(enabled) }, '*');
+    } catch (err) {
+      settled = true;
+      cleanup();
+      reject(err);
+    }
+  });
+}
+
+/**
+ * 从 Sandbox 提取用户在线修改后的 100% 纯净单文件 HTML（不含探针与编辑框残留）
+ */
+export function requestCleanHtmlFromSandbox(iframeEl, timeoutMs = 5000) {
+  return new Promise((resolve, reject) => {
+    if (!iframeEl || !iframeEl.contentWindow) {
+      reject(new Error('Sandbox not mounted'));
+      return;
+    }
+    const requestId = `wri_clean_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    let settled = false;
+    const cleanup = () => {
+      window.removeEventListener('message', onMessage);
+      clearTimeout(timer);
+    };
+    const onMessage = (event) => {
+      if (settled || event.source !== iframeEl.contentWindow) return;
+      const data = event.data;
+      if (!data || data.type !== CLEAN_HTML_RES_TYPE || data.requestId !== requestId) return;
+      settled = true;
+      cleanup();
+      if (data.ok && typeof data.html === 'string') resolve(data.html);
+      else reject(new Error(data.error || 'Extract clean HTML failed'));
+    };
+    const timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(new Error('Clean HTML request timeout'));
+    }, timeoutMs);
+
+    window.addEventListener('message', onMessage);
+    try {
+      iframeEl.contentWindow.postMessage({ type: CLEAN_HTML_REQ_TYPE, requestId }, '*');
+    } catch (err) {
+      settled = true;
+      cleanup();
+      reject(err);
     }
   });
 }

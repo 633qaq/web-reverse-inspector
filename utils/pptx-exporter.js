@@ -222,28 +222,52 @@ function buildEffectLstXml(shadow, extraOpacity = 1) {
   return `<a:effectLst><a:outerShdw blurRad="${blurRad}" dist="${dist}" dir="${dir}" algn="ctr" rotWithShape="0">${clr}</a:outerShdw></a:effectLst>`;
 }
 
+const SAFE_UNIVERSAL_FONTS = new Set([
+  'microsoft yahei', 'simhei', 'simsun', 'kaiti', 'fangsong', 'dengxian',
+  'arial', 'calibri', 'segoe ui', 'tahoma', 'verdana', 'times new roman',
+  'georgia', 'consolas', 'courier new', 'trebuchet ms', 'cambria'
+]);
+
+const CJK_SANS_RE = /pingfang|hiragino|noto sans (sc|tc|cjk|jp)|source han sans|heiti|wenquanyi|alibaba|harmonyos|miui|oppo/i;
+const CJK_SERIF_RE = /stsong|songti|noto serif (sc|tc|cjk)|source han serif|fangsong/i;
+const MONO_FONT_RE = /jetbrains|fira code|sf mono|source code|menlo|monaco|roboto mono|ibm plex mono/i;
+
 /**
- * 清理字体名称（取首位有效字体，过滤 CSS 泛型关键字）
+ * 清理并按需映射跨平台高兼容 Office 字体，减少不同电脑打开 .pptx 时的字体回退跑版
+ * @param {string} fontFamily
+ * @param {boolean} [fontSafeMap=true]
  */
-function resolveTypeface(fontFamily = '') {
+export function resolveTypeface(fontFamily = '', fontSafeMap = true) {
   const generic = new Set(['sans-serif', 'serif', 'monospace', 'system-ui', '-apple-system', 'blinkmacsystemfont', 'ui-sans-serif', 'ui-serif', 'ui-monospace', 'inherit', 'initial', 'unset']);
   const parts = String(fontFamily)
     .split(',')
     .map((s) => s.trim().replace(/^["']|["']$/g, ''))
     .filter(Boolean);
 
+  let chosen = '';
   for (const name of parts) {
     if (!generic.has(name.toLowerCase())) {
-      return name;
+      chosen = name;
+      break;
     }
   }
-  return 'Microsoft YaHei';
+  if (!chosen) return 'Microsoft YaHei';
+  if (!fontSafeMap) return chosen;
+
+  const lower = chosen.toLowerCase();
+  if (SAFE_UNIVERSAL_FONTS.has(lower)) return chosen;
+  if (CJK_SERIF_RE.test(lower)) return 'SimSun';
+  if (CJK_SANS_RE.test(lower)) return 'Microsoft YaHei';
+  if (MONO_FONT_RE.test(lower)) return 'Consolas';
+  if (/serif/i.test(lower)) return 'Georgia';
+  // 常见网页西文无衬线字体（Inter / SF Pro / Roboto / Space Grotesk 等）统一映射至跨平台 Arial
+  return 'Arial';
 }
 
 /**
  * 构建文本体 XML（支持 <p:txBody> 与表格单元格 <a:txBody>）
  */
-function buildTextBodyXml(textObj, { tagName = 'p:txBody', padding = null, extraOpacity = 1, defaultFontSizePx = 16 } = {}) {
+function buildTextBodyXml(textObj, { tagName = 'p:txBody', padding = null, extraOpacity = 1, defaultFontSizePx = 16, fontSafeMap = true } = {}) {
   const anchorMap = {
     top: 't',
     middle: 'ctr',
@@ -312,7 +336,7 @@ function buildTextBodyXml(textObj, { tagName = 'p:txBody', padding = null, extra
 
       const clrXml = buildSrgbClrXml(run.color || '#000000', (run.alpha ?? 1) * extraOpacity);
       const fillXml = clrXml ? `<a:solidFill>${clrXml}</a:solidFill>` : '<a:solidFill><a:srgbClr val="000000"/></a:solidFill>';
-      const typeface = escXml(resolveTypeface(run.fontFamily));
+      const typeface = escXml(resolveTypeface(run.fontFamily, fontSafeMap));
       const rPr = `<a:rPr lang="zh-CN" altLang="en-US" sz="${sz}"${bAttr}${iAttr}${uAttr}${strikeAttr}${spcVal} dirty="0">${fillXml}<a:latin typeface="${typeface}"/><a:ea typeface="${typeface}"/><a:cs typeface="${typeface}"/></a:rPr>`;
 
       // 若 run 内部含换行符，拆为 <a:r> + <a:br/>
@@ -357,6 +381,12 @@ function buildXfrmXml(box, tagName = 'a:xfrm') {
   return `<${tagName}${attrStr}><a:off x="${x}" y="${y}"/><a:ext cx="${cx}" cy="${cy}"/></${tagName}>`;
 }
 
+const SUPPORTED_DIRECT_PRESETS = new Set([
+  'rect', 'roundRect', 'ellipse', 'triangle', 'rtTriangle', 'diamond',
+  'parallelogram', 'trapezoid', 'pentagon', 'hexagon', 'octagon',
+  'rightArrow', 'leftArrow', 'upArrow', 'downArrow', 'chevron', 'star5', 'plus', 'line'
+]);
+
 /**
  * 构建形状几何 <a:prstGeom>
  */
@@ -368,9 +398,12 @@ function buildGeometryXml(geometry, box) {
   if (preset === 'ellipse') {
     return '<a:prstGeom prst="ellipse"><a:avLst/></a:prstGeom>';
   }
-  if (preset === 'roundRect' || r > 0.5) {
+  if (preset === 'roundRect' || (preset === 'rect' && r > 0.5)) {
     const adj = clamp(Math.round((r / minSide) * 100000), 0, 50000);
     return `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${adj}"/></a:avLst></a:prstGeom>`;
+  }
+  if (SUPPORTED_DIRECT_PRESETS.has(preset)) {
+    return `<a:prstGeom prst="${preset}"><a:avLst/></a:prstGeom>`;
   }
   return '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
 }
@@ -378,7 +411,7 @@ function buildGeometryXml(geometry, box) {
 /**
  * 构建形状 / 文本框节点 <p:sp>
  */
-function buildShapeXml(el, id) {
+function buildShapeXml(el, id, fontSafeMap = true) {
   const opacity = clamp(Number.isFinite(el.opacity) ? el.opacity : 1, 0, 1);
   const hasVisibleFill = el.fill && el.fill.kind !== 'none';
   const hasVisibleStroke = el.stroke && el.stroke.widthPx > 0.1 && parseCssColor(el.stroke.color);
@@ -408,7 +441,7 @@ function buildShapeXml(el, id) {
   const spPr = `<p:spPr>${spPrParts.join('')}</p:spPr>`;
 
   const txBody = el.text
-    ? buildTextBodyXml(el.text, { tagName: 'p:txBody', padding: el.padding, extraOpacity: opacity })
+    ? buildTextBodyXml(el.text, { tagName: 'p:txBody', padding: el.padding, extraOpacity: opacity, fontSafeMap })
     : '';
 
   return `<p:sp>${nvSpPr}${spPr}${txBody}</p:sp>`;
@@ -470,7 +503,7 @@ function buildCellBorderXml(tagName, border) {
 /**
  * 构建原生表格 <p:graphicFrame><a:tbl>
  */
-function buildTableXml(el, id) {
+function buildTableXml(el, id, fontSafeMap = true) {
   const colWidths = Array.isArray(el.colWidthsPx) && el.colWidthsPx.length > 0
     ? el.colWidthsPx
     : [Math.max(40, el.box?.wPx || 200)];
@@ -498,7 +531,8 @@ function buildTableXml(el, id) {
         const txBody = buildTextBodyXml(cell.hMerge || cell.vMerge ? null : cell.text, {
           tagName: 'a:txBody',
           padding: cell.padding || { topPx: 4, rightPx: 6, bottomPx: 4, leftPx: 6 },
-          defaultFontSizePx: 14
+          defaultFontSizePx: 14,
+          fontSafeMap
         });
 
         const vAlignMap = { top: 't', middle: 'ctr', center: 'ctr', bottom: 'b' };
@@ -616,7 +650,12 @@ function buildTableStylesXml() {
  * @param {object} model
  * @returns {Promise<{ bytes: Uint8Array, summary: object }>}
  */
-export async function exportSlidesModelToPptxBytes(model) {
+export async function exportSlidesModelToPptxBytes(model, options = {}) {
+  const fontSafeMap = options.fontSafeMap !== undefined
+    ? Boolean(options.fontSafeMap)
+    : model?.exportOptions?.fontSafeMap !== undefined
+    ? Boolean(model.exportOptions.fontSafeMap)
+    : true;
   const stageW = Math.max(320, Number(model?.stageW) || 1280);
   const stageH = Math.max(240, Number(model?.stageH) || 720);
   const slides = Array.isArray(model?.slides) && model.slides.length > 0 ? model.slides : [];
@@ -708,7 +747,7 @@ export async function exportSlidesModelToPptxBytes(model) {
 
       if (el.type === 'shape') {
         const spId = nextShapeId++;
-        nodesXml.push(buildShapeXml(el, spId));
+        nodesXml.push(buildShapeXml(el, spId, fontSafeMap));
         summary.shapeCount++;
         if (el.text) summary.textShapeCount++;
       } else if (el.type === 'image' && el.dataUrl) {
@@ -722,7 +761,7 @@ export async function exportSlidesModelToPptxBytes(model) {
         }
       } else if (el.type === 'table' && Array.isArray(el.rows) && el.rows.length > 0) {
         const tblId = nextShapeId++;
-        nodesXml.push(buildTableXml(el, tblId));
+        nodesXml.push(buildTableXml(el, tblId, fontSafeMap));
         summary.tableCount++;
       }
     }
@@ -864,8 +903,8 @@ export async function exportSlidesModelToPptxBytes(model) {
  * @param {object} model
  * @returns {Promise<{ blob: Blob, summary: object }>}
  */
-export async function exportSlidesModelToPptxBlob(model) {
-  const { bytes, summary } = await exportSlidesModelToPptxBytes(model);
+export async function exportSlidesModelToPptxBlob(model, options = {}) {
+  const { bytes, summary } = await exportSlidesModelToPptxBytes(model, options);
   const blob = new Blob([bytes], {
     type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
   });

@@ -6,8 +6,20 @@
 import { formatLayoutSection, compilePptxPrompt } from '../utils/prompt-compiler.js';
 import { parsePptxBuffer } from '../utils/pptx-parser.js';
 import { renderPptxToHtmlDeck } from '../utils/pptx-html-renderer.js';
-import { injectSandboxExportProbe, requestSlidesSnapshotFromSandbox } from '../utils/html-slide-extractor.js';
+import {
+  injectSandboxExportProbe,
+  requestSlidesSnapshotFromSandbox,
+  toggleSandboxEditMode,
+  requestCleanHtmlFromSandbox
+} from '../utils/html-slide-extractor.js';
 import { exportSlidesModelToPptxBlob } from '../utils/pptx-exporter.js';
+import {
+  listHistoryRecords,
+  saveHistoryRecord,
+  deleteHistoryRecord,
+  clearHistoryRecords,
+  mergeHistoryItemsIntoDeck
+} from '../utils/history-store.js';
 import { t, applyDomI18n, detectDefaultLang, normalizeLang } from '../utils/i18n.js';
 
 const STORAGE_KEY = 'wri_user_config_v1';
@@ -64,20 +76,27 @@ const state = {
     geminiApiKey: '',
     geminiModel: 'gemini-4-argon',
     openaiApiKey: '',
+    openaiBaseUrl: '',
     openaiModel: 'gpt-6.2-astra',
     customModelId: '',
+    customInstruction: '',
+    pptxExportMode: 'native',
+    fontSafeMap: true,
     modelSchemaVersion: 2,
     theme: 'dark',
     lang: detectDefaultLang()
   },
   isStreaming: false,
   isExportingPptx: false,
+  sandboxEditMode: false,
+  sandboxEditedOnce: false,
   streamBuffer: '',
   extractedHtmlCode: '',
   sandboxMountedCode: '',
   sandboxReadyPromise: null,
   lastCapturePayload: null,
-  pptxDoc: null
+  pptxDoc: null,
+  historyCache: []
 };
 
 function tr(key, vars = {}) {
@@ -92,21 +111,40 @@ const els = {
   statusBadge: document.getElementById('statusBadge'),
   statusText: document.getElementById('statusText'),
   statusDetail: document.getElementById('statusDetail'),
+  toggleHistoryBtn: document.getElementById('toggleHistoryBtn'),
   langToggleBtn: document.getElementById('langToggleBtn'),
   themeToggleBtn: document.getElementById('themeToggleBtn'),
   toggleSettingsBtn: document.getElementById('toggleSettingsBtn'),
   closeSettingsBtn: document.getElementById('closeSettingsBtn'),
   settingsDrawer: document.getElementById('settingsDrawer'),
+  historyDrawer: document.getElementById('historyDrawer'),
+  closeHistoryBtn: document.getElementById('closeHistoryBtn'),
+  mergeHistoryBtn: document.getElementById('mergeHistoryBtn'),
+  clearHistoryBtn: document.getElementById('clearHistoryBtn'),
+  historyList: document.getElementById('historyList'),
   geminiApiKey: document.getElementById('geminiApiKey'),
   geminiModel: document.getElementById('geminiModel'),
   openaiApiKey: document.getElementById('openaiApiKey'),
+  openaiBaseUrl: document.getElementById('openaiBaseUrl'),
   openaiModel: document.getElementById('openaiModel'),
+  pptxExportModeSelect: document.getElementById('pptxExportModeSelect'),
+  fontSafeMapToggle: document.getElementById('fontSafeMapToggle'),
   saveConfigBtn: document.getElementById('saveConfigBtn'),
   saveToast: document.getElementById('saveToast'),
   wbTabWeb: document.getElementById('wbTabWeb'),
   wbTabPptx: document.getElementById('wbTabPptx'),
+  wbTabHtml: document.getElementById('wbTabHtml'),
   webCaptureBox: document.getElementById('webCaptureBox'),
   pptxCaptureBox: document.getElementById('pptxCaptureBox'),
+  htmlDirectBox: document.getElementById('htmlDirectBox'),
+  directiveBox: document.getElementById('directiveBox'),
+  customDirectiveInput: document.getElementById('customDirectiveInput'),
+  directiveChips: document.querySelectorAll('.directive-chip'),
+  htmlDropZone: document.getElementById('htmlDropZone'),
+  htmlFileInput: document.getElementById('htmlFileInput'),
+  htmlPasteInput: document.getElementById('htmlPasteInput'),
+  loadHtmlToSandboxBtn: document.getElementById('loadHtmlToSandboxBtn'),
+  directHtmlToPptxBtn: document.getElementById('directHtmlToPptxBtn'),
   pptxDropZone: document.getElementById('pptxDropZone'),
   pptxFileInput: document.getElementById('pptxFileInput'),
   pptxLoadedCard: document.getElementById('pptxLoadedCard'),
@@ -145,6 +183,8 @@ const els = {
   copyCodeBtn: document.getElementById('copyCodeBtn'),
   sandboxFrame: document.getElementById('sandboxFrame'),
   sandboxStatusText: document.getElementById('sandboxStatusText'),
+  toggleSandboxEditBtn: document.getElementById('toggleSandboxEditBtn'),
+  openFullscreenTabBtn: document.getElementById('openFullscreenTabBtn'),
   sandboxDownloadHtmlBtn: document.getElementById('sandboxDownloadHtmlBtn'),
   sandboxExportPptxBtn: document.getElementById('sandboxExportPptxBtn'),
   refreshSandboxBtn: document.getElementById('refreshSandboxBtn')
@@ -294,7 +334,11 @@ async function loadPersistedConfig() {
   els.geminiApiKey.value = state.config.geminiApiKey || '';
   els.geminiModel.value = state.config.geminiModel || 'gemini-4-argon';
   els.openaiApiKey.value = state.config.openaiApiKey || '';
+  if (els.openaiBaseUrl) els.openaiBaseUrl.value = state.config.openaiBaseUrl || '';
   els.openaiModel.value = state.config.openaiModel || 'gpt-6.2-astra';
+  if (els.pptxExportModeSelect) els.pptxExportModeSelect.value = state.config.pptxExportMode || 'native';
+  if (els.fontSafeMapToggle) els.fontSafeMapToggle.checked = state.config.fontSafeMap !== false;
+  if (els.customDirectiveInput) els.customDirectiveInput.value = state.config.customInstruction || '';
   applyTheme(state.config.theme || 'dark');
   applyLanguage(state.config.lang || detectDefaultLang(), { refreshStatus: false });
 }
@@ -355,6 +399,10 @@ async function saveConfigToStorage(showToast = true) {
     channel: els.channelSelect.value,
     geminiApiKey: els.geminiApiKey.value.trim(),
     openaiApiKey: els.openaiApiKey.value.trim(),
+    openaiBaseUrl: els.openaiBaseUrl ? els.openaiBaseUrl.value.trim() : state.config.openaiBaseUrl,
+    customInstruction: els.customDirectiveInput ? els.customDirectiveInput.value.trim() : state.config.customInstruction,
+    pptxExportMode: els.pptxExportModeSelect ? els.pptxExportModeSelect.value : state.config.pptxExportMode,
+    fontSafeMap: els.fontSafeMapToggle ? Boolean(els.fontSafeMapToggle.checked) : true,
     theme: document.documentElement.getAttribute('data-theme') || 'dark',
     lang: normalizeLang(state.config.lang)
   };
@@ -414,10 +462,6 @@ function renderCapturePreview(payload) {
   if (!payload) return;
   state.lastCapturePayload = payload;
 
-  // 确保调试面板处于展开态
-  els.debugBody.classList.remove('hidden');
-  els.debugCollapseIcon.style.transform = 'rotate(0deg)';
-
   const modeMap = {
     inspector: tr('modeInspectorLabel'),
     recorder: tr('modeRecorderLabel'),
@@ -443,7 +487,7 @@ function renderCapturePreview(payload) {
 
   // 2.1 选区布局结构（与发给 AI 的 Prompt 第一部分完全一致）
   if (els.debugLayoutPre) {
-    els.debugLayoutPre.textContent = formatLayoutSection(payload.layout);
+    els.debugLayoutPre.textContent = formatLayoutSection(payload.layout, state.config.lang);
   }
 
   // 截图有效性提示
@@ -480,12 +524,22 @@ function extractHtmlBlock(markdownText = '') {
   return '';
 }
 
+function resetSandboxEditUi() {
+  state.sandboxEditMode = false;
+  state.sandboxEditedOnce = false;
+  if (els.toggleSandboxEditBtn) {
+    els.toggleSandboxEditBtn.classList.remove('edit-active');
+    els.toggleSandboxEditBtn.textContent = tr('sandboxEditBtn');
+  }
+}
+
 /**
  * 将提取出的 HTML 代码挂载至安全隔离的 Sandbox iframe（仅在预览态附加导出测量探针，不污染原始代码）
  */
 function updateSandboxPreview(htmlCode, { forceReload = false } = {}) {
   const code = htmlCode || state.extractedHtmlCode;
   if (!code) {
+    resetSandboxEditUi();
     state.sandboxMountedCode = '';
     state.sandboxReadyPromise = null;
     els.sandboxStatusText.textContent = tr('sandboxPromptModeStatus');
@@ -497,6 +551,7 @@ function updateSandboxPreview(htmlCode, { forceReload = false } = {}) {
     return;
   }
 
+  resetSandboxEditUi();
   state.sandboxMountedCode = code;
   state.sandboxReadyPromise = new Promise((resolve) => {
     let done = false;
@@ -532,6 +587,7 @@ async function startPageCapture(mode = 'hybrid') {
     hybrid: tr('hintStartHybrid')
   };
   els.statusDetail.textContent = modeHintMap[mode] || tr('hintStartDefault');
+  getCustomDirective();
 
   const res = await sendMessageSafe({
     type: 'START_PAGE_CAPTURE',
@@ -662,6 +718,19 @@ function setupRuntimeStreamListener() {
           state.extractedHtmlCode = code;
           updateSandboxPreview(code);
         }
+        // 自动保存至本地 IndexedDB 历史记录
+        recordSessionToHistory({
+          kind: code ? 'ai' : 'web',
+          title:
+            state.lastCapturePayload?.pageTitle ||
+            state.pptxDoc?.fileName ||
+            state.lastCapturePayload?.tagName ||
+            'AI Reverse Output',
+          subtitle: `${state.config.channel} · ${code ? `HTML (${code.length} chars)` : 'Prompt'}`,
+          thumbnail: state.lastCapturePayload?.screenshotBase64 || '',
+          promptText: state.streamBuffer,
+          htmlCode: code || state.extractedHtmlCode
+        });
         sendResponse({ ok: true });
         return false;
       }
@@ -740,14 +809,26 @@ async function copyTextWithFeedback(text, btnElement, labelKey) {
 }
 
 /**
- * 切换工作台模式：网页捕获逆向 vs PPTX 文件复刻
+ * 切换工作台模式：网页逆向 vs PPTX 复刻 vs HTML 直接转 PPTX
  */
 function switchWorkbenchMode(mode) {
-  const isPptx = mode === 'pptx';
-  els.wbTabWeb?.classList.toggle('active', !isPptx);
-  els.wbTabPptx?.classList.toggle('active', isPptx);
-  els.webCaptureBox?.classList.toggle('hidden', isPptx);
-  els.pptxCaptureBox?.classList.toggle('hidden', !isPptx);
+  const target = mode === 'pptx' ? 'pptx' : mode === 'html' ? 'html' : 'web';
+  els.wbTabWeb?.classList.toggle('active', target === 'web');
+  els.wbTabPptx?.classList.toggle('active', target === 'pptx');
+  els.wbTabHtml?.classList.toggle('active', target === 'html');
+  els.webCaptureBox?.classList.toggle('hidden', target !== 'web');
+  els.pptxCaptureBox?.classList.toggle('hidden', target !== 'pptx');
+  els.htmlDirectBox?.classList.toggle('hidden', target !== 'html');
+  els.directiveBox?.classList.toggle('hidden', target === 'html');
+}
+
+/**
+ * 同步并读取最新的用户定制改稿指令
+ */
+function getCustomDirective() {
+  const val = (els.customDirectiveInput?.value || state.config.customInstruction || '').trim();
+  state.config.customInstruction = val;
+  return val;
 }
 
 /**
@@ -768,7 +849,12 @@ function renderPptxDebugPreview(slideIndex = 0) {
   els.screenshotEmpty.classList.remove('hidden');
   els.screenshotEmpty.textContent = tr('pptxDebugVisualHint', { count: slide.elements.length });
 
-  const promptPkg = compilePptxPrompt(doc, { scope: 'single', slideIndex: slide.slideNumber - 1 });
+  const promptPkg = compilePptxPrompt(doc, {
+    scope: 'single',
+    slideIndex: slide.slideNumber - 1,
+    lang: state.config.lang,
+    customInstruction: getCustomDirective()
+  });
   if (els.debugLayoutPre) {
     els.debugLayoutPre.textContent = promptPkg.userPrompt;
   }
@@ -829,6 +915,13 @@ async function handlePptxFile(file) {
     renderPptxDebugPreview(0);
     // 自动生成 1:1 HTML 演示稿并立即渲染到 Sandbox，同时生成首屏 Prompt
     generatePptxOutputs({ openSandbox: true });
+    recordSessionToHistory({
+      kind: 'pptx',
+      title: pptxDoc.fileName,
+      subtitle: `${pptxDoc.slideCount} slides · ${pptxDoc.ratioLabel}`,
+      promptText: state.streamBuffer,
+      htmlCode: state.extractedHtmlCode
+    });
     els.statusDetail.textContent = tr('pptxParsedOk', {
       file: file.name,
       count: pptxDoc.slideCount,
@@ -854,7 +947,12 @@ function generatePptxOutputs({ openSandbox = false } = {}) {
   if (!doc) return;
   const { slideIndex, scope } = getPptxSelection();
 
-  const compiled = compilePptxPrompt(doc, { scope, slideIndex });
+  const compiled = compilePptxPrompt(doc, {
+    scope,
+    slideIndex,
+    lang: state.config.lang,
+    customInstruction: getCustomDirective()
+  });
   state.streamBuffer = compiled.combinedPromptForWeb;
   els.promptOutput.textContent = state.streamBuffer;
   els.promptOutput.classList.remove('streaming');
@@ -877,7 +975,12 @@ async function sendPptxToSelectedAi() {
   const doc = state.pptxDoc;
   if (!doc) return;
   const { slideIndex, scope } = getPptxSelection();
-  const compiledPrompt = compilePptxPrompt(doc, { scope, slideIndex });
+  const compiledPrompt = compilePptxPrompt(doc, {
+    scope,
+    slideIndex,
+    lang: state.config.lang,
+    customInstruction: getCustomDirective()
+  });
 
   switchOutputView('prompt');
   els.statusDetail.textContent = tr('pptxSendingAi', { channel: state.config.channel });
@@ -925,10 +1028,21 @@ function resolveExportBaseName(fallbackTitle = '') {
 }
 
 /**
- * 一键导出当前单文件纯净 .html 演示稿（不含任何探针脚本）
+ * 获取当前最新且 100% 纯净的单文件 HTML（若用户在 Sandbox 改过字，自动同步拉取修改后的纯净 HTML）
  */
-function downloadPptxHtmlFile() {
+async function getLatestCleanHtml() {
   let htmlDeck = state.extractedHtmlCode || extractHtmlBlock(state.streamBuffer);
+  if ((state.sandboxEditMode || state.sandboxEditedOnce) && els.sandboxFrame?.contentWindow && state.sandboxMountedCode) {
+    try {
+      const editedClean = await requestCleanHtmlFromSandbox(els.sandboxFrame, 4000);
+      if (editedClean && editedClean.trim()) {
+        htmlDeck = editedClean;
+        state.extractedHtmlCode = editedClean;
+      }
+    } catch (_err) {
+      // 拉取失败则回退内存版
+    }
+  }
   if (!htmlDeck && state.pptxDoc) {
     const { slideIndex, scope } = getPptxSelection();
     htmlDeck = renderPptxToHtmlDeck(state.pptxDoc, {
@@ -937,6 +1051,14 @@ function downloadPptxHtmlFile() {
       lang: state.config.lang
     });
   }
+  return htmlDeck || '';
+}
+
+/**
+ * 一键导出当前单文件纯净 .html 演示稿（不含任何探针脚本）
+ */
+async function downloadPptxHtmlFile() {
+  const htmlDeck = await getLatestCleanHtml();
   if (!htmlDeck) {
     els.statusDetail.textContent = tr('pptxNoHtmlToExport');
     return;
@@ -945,6 +1067,242 @@ function downloadPptxHtmlFile() {
   const blob = new Blob([htmlDeck], { type: 'text/html;charset=utf-8' });
   triggerBlobDownload(blob, `${resolveExportBaseName()}.html`);
   els.statusDetail.textContent = tr('pptxHtmlExported', { kb: Math.max(1, Math.round(blob.size / 1024)) });
+}
+
+/**
+ * 切换 Sandbox 在线直接改字模式 (contenteditable)
+ */
+async function handleToggleSandboxEdit() {
+  const htmlCode = state.extractedHtmlCode || extractHtmlBlock(state.streamBuffer);
+  if (!htmlCode) {
+    els.statusDetail.textContent = tr('pptxNeedSandboxHtml');
+    return;
+  }
+  if (!els.sandboxPane.classList.contains('active')) {
+    switchOutputView('sandbox');
+  }
+  if (state.sandboxMountedCode !== htmlCode || !state.sandboxReadyPromise) {
+    updateSandboxPreview(htmlCode, { forceReload: true });
+  }
+  if (state.sandboxReadyPromise) {
+    await state.sandboxReadyPromise;
+  }
+
+  const nextEnabled = !state.sandboxEditMode;
+  try {
+    const res = await toggleSandboxEditMode(els.sandboxFrame, nextEnabled);
+    state.sandboxEditMode = Boolean(res.enabled);
+    if (state.sandboxEditMode) {
+      state.sandboxEditedOnce = true;
+      els.toggleSandboxEditBtn?.classList.add('edit-active');
+      if (els.toggleSandboxEditBtn) els.toggleSandboxEditBtn.textContent = tr('sandboxEditBtnActive');
+      els.sandboxStatusText.textContent = tr('sandboxEditEnabledStatus', { count: res.count || 0 });
+      els.statusDetail.textContent = tr('sandboxEditEnabledStatus', { count: res.count || 0 });
+    } else {
+      els.toggleSandboxEditBtn?.classList.remove('edit-active');
+      if (els.toggleSandboxEditBtn) els.toggleSandboxEditBtn.textContent = tr('sandboxEditBtn');
+      // 退出改字时同步回写纯净 HTML
+      try {
+        const clean = await requestCleanHtmlFromSandbox(els.sandboxFrame, 4000);
+        if (clean) state.extractedHtmlCode = clean;
+      } catch (_e) {}
+      els.sandboxStatusText.textContent = tr('sandboxEditDisabledStatus');
+      els.statusDetail.textContent = tr('sandboxEditDisabledStatus');
+    }
+  } catch (err) {
+    els.statusDetail.textContent = `❌ ${err?.message || String(err)}`;
+  }
+}
+
+/**
+ * 在新标签页大屏全视野检视当前纯净 HTML 演示稿
+ */
+async function openSandboxInFullscreenTab() {
+  const htmlDeck = await getLatestCleanHtml();
+  if (!htmlDeck) {
+    els.statusDetail.textContent = tr('pptxNoHtmlToExport');
+    return;
+  }
+  const blob = new Blob([htmlDeck], { type: 'text/html;charset=utf-8' });
+  const blobUrl = URL.createObjectURL(blob);
+  try {
+    if (chrome.tabs?.create) {
+      await chrome.tabs.create({ url: blobUrl, active: true });
+    } else {
+      window.open(blobUrl, '_blank', 'noopener');
+    }
+  } catch (_err) {
+    window.open(blobUrl, '_blank', 'noopener');
+  }
+  setTimeout(() => URL.revokeObjectURL(blobUrl), 60000);
+}
+
+/**
+ * 直接导入 .html 文件或粘贴 HTML 代码载入 Sandbox（支持一键直出 .pptx）
+ */
+async function handleDirectHtmlInput(rawHtml, titleHint = '', { autoExportPptx = false } = {}) {
+  const code = String(rawHtml || '').trim();
+  if (!code) {
+    els.statusDetail.textContent = tr('htmlEmptyWarn');
+    return;
+  }
+
+  state.extractedHtmlCode = code;
+  if (els.htmlPasteInput && els.htmlPasteInput.value.trim() !== code) {
+    els.htmlPasteInput.value = code;
+  }
+  updateSandboxPreview(code, { forceReload: true });
+  switchOutputView('sandbox');
+  els.statusDetail.textContent = tr('htmlLoadedOk', { chars: code.length });
+
+  const titleMatch = code.match(/<title[^>]*>([^<]+)<\/title>/i);
+  const title = titleHint || (titleMatch ? titleMatch[1].trim() : 'Imported HTML Deck');
+  recordSessionToHistory({
+    kind: 'html',
+    title,
+    subtitle: `HTML (${Math.max(1, Math.round(code.length / 1024))} KB)`,
+    htmlCode: code
+  });
+
+  if (autoExportPptx) {
+    await exportCurrentSandboxToPptx();
+  }
+}
+
+async function handleHtmlFileUpload(file) {
+  if (!file) return;
+  try {
+    const text = await file.text();
+    await handleDirectHtmlInput(text, file.name.replace(/\.html?$/i, ''));
+  } catch (err) {
+    els.statusDetail.textContent = `❌ ${err?.message || String(err)}`;
+  }
+}
+
+/**
+ * 本地 IndexedDB 历史记录管理与多页拼合
+ */
+async function recordSessionToHistory(record) {
+  try {
+    await saveHistoryRecord(record);
+    if (!els.historyDrawer?.classList.contains('hidden')) {
+      await renderHistoryDrawer();
+    }
+  } catch (_err) {
+    // 历史记录失败绝不阻断主流程
+  }
+}
+
+function formatHistoryTime(ts) {
+  try {
+    const d = new Date(ts);
+    const pad = (n) => String(n).padStart(2, '0');
+    return `${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  } catch (_e) {
+    return '';
+  }
+}
+
+async function renderHistoryDrawer() {
+  if (!els.historyList) return;
+  const records = await listHistoryRecords();
+  state.historyCache = records;
+
+  if (!records.length) {
+    els.historyList.innerHTML = `<div class="empty-hint">${tr('historyEmpty')}</div>`;
+    return;
+  }
+
+  els.historyList.innerHTML = '';
+  records.forEach((rec) => {
+    const row = document.createElement('div');
+    row.className = 'history-item';
+
+    const cb = document.createElement('input');
+    cb.type = 'checkbox';
+    cb.dataset.historyId = rec.id;
+
+    row.appendChild(cb);
+
+    if (rec.thumbnail) {
+      const img = document.createElement('img');
+      img.className = 'history-thumb';
+      img.src = rec.thumbnail;
+      img.alt = rec.title;
+      row.appendChild(img);
+    }
+
+    const meta = document.createElement('div');
+    meta.className = 'history-meta';
+    const titleEl = document.createElement('div');
+    titleEl.className = 'history-title';
+    const badge = rec.kind === 'pptx' ? '📽️' : rec.kind === 'html' ? '📄' : rec.kind === 'ai' ? '🤖' : '🌐';
+    titleEl.textContent = `${badge} ${rec.title}`;
+    const subEl = document.createElement('div');
+    subEl.className = 'history-sub';
+    subEl.textContent = `${formatHistoryTime(rec.createdAt)}${rec.subtitle ? ' · ' + rec.subtitle : ''}`;
+    meta.appendChild(titleEl);
+    meta.appendChild(subEl);
+    row.appendChild(meta);
+
+    const actions = document.createElement('div');
+    actions.className = 'history-item-actions';
+
+    const restoreBtn = document.createElement('button');
+    restoreBtn.className = 'sandbox-mini-btn';
+    restoreBtn.textContent = tr('historyRestoreBtn');
+    restoreBtn.addEventListener('click', () => {
+      if (rec.promptText) {
+        state.streamBuffer = rec.promptText;
+        els.promptOutput.textContent = rec.promptText;
+        els.promptOutput.classList.remove('streaming');
+      }
+      if (rec.htmlCode) {
+        state.extractedHtmlCode = rec.htmlCode;
+        updateSandboxPreview(rec.htmlCode, { forceReload: true });
+        switchOutputView('sandbox');
+      } else {
+        switchOutputView('prompt');
+      }
+      els.statusDetail.textContent = tr('historyRestoredStatus', { title: rec.title });
+      els.historyDrawer?.classList.add('hidden');
+    });
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'text-btn';
+    delBtn.textContent = tr('historyDeleteBtn');
+    delBtn.addEventListener('click', async () => {
+      await deleteHistoryRecord(rec.id);
+      await renderHistoryDrawer();
+    });
+
+    actions.appendChild(restoreBtn);
+    actions.appendChild(delBtn);
+    row.appendChild(actions);
+    els.historyList.appendChild(row);
+  });
+}
+
+async function mergeSelectedHistoryToDeck() {
+  const checkedIds = Array.from(els.historyList?.querySelectorAll('input[type="checkbox"]:checked') || [])
+    .map((cb) => cb.dataset.historyId)
+    .filter(Boolean);
+  const selected = state.historyCache.filter((r) => checkedIds.includes(r.id));
+  if (selected.length === 0) {
+    els.statusDetail.textContent = tr('historyMergeNeedMore');
+    return;
+  }
+
+  try {
+    const mergedHtml = mergeHistoryItemsIntoDeck(selected, { lang: state.config.lang });
+    state.extractedHtmlCode = mergedHtml;
+    updateSandboxPreview(mergedHtml, { forceReload: true });
+    switchOutputView('sandbox');
+    els.historyDrawer?.classList.add('hidden');
+    els.statusDetail.textContent = tr('historyMergedOk', { count: selected.length });
+  } catch (err) {
+    els.statusDetail.textContent = `❌ ${err?.message || String(err)}`;
+  }
 }
 
 /**
@@ -961,7 +1319,7 @@ async function exportCurrentSandboxToPptx() {
   }
 
   state.isExportingPptx = true;
-  const btns = [els.sandboxExportPptxBtn, els.pptxExportFileBtn].filter(Boolean);
+  const btns = [els.sandboxExportPptxBtn, els.pptxExportFileBtn, els.directHtmlToPptxBtn].filter(Boolean);
 
   try {
     btns.forEach((b) => { b.disabled = true; });
@@ -987,10 +1345,13 @@ async function exportCurrentSandboxToPptx() {
 
     const slidesModel = await requestSlidesSnapshotFromSandbox(els.sandboxFrame, {
       timeoutMs: 20000,
-      rasterScale: 2
+      rasterScale: 2,
+      exportMode: state.config.pptxExportMode || 'native'
     });
 
-    const { blob, summary } = await exportSlidesModelToPptxBlob(slidesModel);
+    const { blob, summary } = await exportSlidesModelToPptxBlob(slidesModel, {
+      fontSafeMap: state.config.fontSafeMap !== false
+    });
     const fileName = `${resolveExportBaseName(slidesModel.title)}_converted.pptx`;
     triggerBlobDownload(blob, fileName);
 
@@ -1040,6 +1401,23 @@ async function exportCurrentSandboxToPptx() {
  * 初始化所有 UI 交互事件
  */
 function bindEvents() {
+  els.toggleHistoryBtn?.addEventListener('click', async () => {
+    els.settingsDrawer.classList.add('hidden');
+    const willOpen = els.historyDrawer?.classList.toggle('hidden') === false;
+    if (willOpen) {
+      await renderHistoryDrawer();
+    }
+  });
+  els.closeHistoryBtn?.addEventListener('click', () => {
+    els.historyDrawer?.classList.add('hidden');
+  });
+  els.mergeHistoryBtn?.addEventListener('click', () => mergeSelectedHistoryToDeck());
+  els.clearHistoryBtn?.addEventListener('click', async () => {
+    await clearHistoryRecords();
+    await renderHistoryDrawer();
+    els.statusDetail.textContent = tr('historyClearedOk');
+  });
+
   els.langToggleBtn?.addEventListener('click', () => {
     const nextLang = state.config.lang === 'en' ? 'zh' : 'en';
     applyLanguage(nextLang, { refreshStatus: false });
@@ -1053,10 +1431,32 @@ function bindEvents() {
   });
 
   els.toggleSettingsBtn.addEventListener('click', () => {
+    els.historyDrawer?.classList.add('hidden');
     els.settingsDrawer.classList.toggle('hidden');
   });
   els.closeSettingsBtn.addEventListener('click', () => {
     els.settingsDrawer.classList.add('hidden');
+  });
+
+  els.pptxExportModeSelect?.addEventListener('change', () => saveConfigToStorage(false));
+  els.fontSafeMapToggle?.addEventListener('change', () => saveConfigToStorage(false));
+
+  // 自定义改稿指令框与快捷芯片
+  els.customDirectiveInput?.addEventListener('change', () => {
+    getCustomDirective();
+    saveConfigToStorage(false);
+  });
+  els.directiveChips?.forEach((chip) => {
+    chip.addEventListener('click', () => {
+      const preset = chip.dataset.preset;
+      let val = '';
+      if (preset === 'rewrite') val = tr('chipRewritePrompt');
+      else if (preset === 'lightBiz') val = tr('chipLightBizPrompt');
+      else if (preset === 'concise') val = tr('chipConcisePrompt');
+      if (els.customDirectiveInput) els.customDirectiveInput.value = val;
+      state.config.customInstruction = val;
+      saveConfigToStorage(false);
+    });
   });
 
   els.channelSelect.addEventListener('change', () => {
@@ -1101,9 +1501,37 @@ function bindEvents() {
     refreshChannelStatus();
   });
 
-  // 工作台模式切换（网页捕获 vs PPTX 复刻）
+  // 工作台三模式切换（网页捕获 vs PPTX 复刻 vs HTML 直接转 PPTX）
   els.wbTabWeb?.addEventListener('click', () => switchWorkbenchMode('web'));
   els.wbTabPptx?.addEventListener('click', () => switchWorkbenchMode('pptx'));
+  els.wbTabHtml?.addEventListener('click', () => switchWorkbenchMode('html'));
+
+  // HTML 直接导入/粘贴转 PPTX 工作台事件
+  els.htmlDropZone?.addEventListener('click', () => els.htmlFileInput?.click());
+  els.htmlFileInput?.addEventListener('change', (e) => {
+    const file = e.target?.files?.[0];
+    if (file) handleHtmlFileUpload(file);
+    e.target.value = '';
+  });
+  els.htmlDropZone?.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    els.htmlDropZone.classList.add('drag-over');
+  });
+  els.htmlDropZone?.addEventListener('dragleave', () => {
+    els.htmlDropZone.classList.remove('drag-over');
+  });
+  els.htmlDropZone?.addEventListener('drop', (e) => {
+    e.preventDefault();
+    els.htmlDropZone.classList.remove('drag-over');
+    const file = e.dataTransfer?.files?.[0];
+    if (file) handleHtmlFileUpload(file);
+  });
+  els.loadHtmlToSandboxBtn?.addEventListener('click', () => {
+    handleDirectHtmlInput(els.htmlPasteInput?.value || '');
+  });
+  els.directHtmlToPptxBtn?.addEventListener('click', () => {
+    handleDirectHtmlInput(els.htmlPasteInput?.value || '', '', { autoExportPptx: true });
+  });
 
   // PPTX 文件上传与拖拽
   els.pptxDropZone?.addEventListener('click', () => els.pptxFileInput?.click());
@@ -1183,11 +1611,13 @@ function bindEvents() {
   els.tabPromptBtn.addEventListener('click', () => switchOutputView('prompt'));
   els.tabSandboxBtn.addEventListener('click', () => switchOutputView('sandbox'));
 
-  // 刷新 Sandbox 与一键导出 HTML / PPTX
+  // 刷新 Sandbox、在线改字、大屏检视与一键导出 HTML / PPTX
   els.refreshSandboxBtn.addEventListener('click', () => {
     const code = extractHtmlBlock(state.streamBuffer) || state.extractedHtmlCode;
     updateSandboxPreview(code, { forceReload: true });
   });
+  els.toggleSandboxEditBtn?.addEventListener('click', () => handleToggleSandboxEdit());
+  els.openFullscreenTabBtn?.addEventListener('click', () => openSandboxInFullscreenTab());
   els.sandboxDownloadHtmlBtn?.addEventListener('click', () => downloadPptxHtmlFile());
   els.sandboxExportPptxBtn?.addEventListener('click', () => exportCurrentSandboxToPptx());
 

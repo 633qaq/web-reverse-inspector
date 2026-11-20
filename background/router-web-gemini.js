@@ -71,7 +71,8 @@ async function findOrCreateGeminiTab() {
 /**
  * 在 gemini.google.com 标签页的 MAIN 世界上下文中读取 WIZ_global_data.SNlM0e
  */
-async function extractGeminiTokenViaMainWorld() {
+async function extractGeminiTokenViaMainWorld(lang = 'zh') {
+  const isEn = String(lang || '').toLowerCase().startsWith('en');
   try {
     const tabId = await findOrCreateGeminiTab();
     const results = await chrome.scripting.executeScript({
@@ -111,18 +112,24 @@ async function extractGeminiTokenViaMainWorld() {
       return {
         ok: true,
         ...cachedGeminiParams,
-        reason: '已通过官网标签页连接 Gemini Web'
+        reason: isEn
+          ? 'Connected to Gemini Web via official tab'
+          : '已通过官网标签页连接 Gemini Web'
       };
     }
 
     return {
       ok: false,
-      reason: '未在 gemini.google.com 提取到有效登录态，请先在浏览器打开 gemini.google.com 登录 Google 账号'
+      reason: isEn
+        ? 'No valid Gemini Web session found. Please sign in at gemini.google.com.'
+        : '未在 gemini.google.com 提取到有效登录态，请先在浏览器打开 gemini.google.com 登录 Google 账号'
     };
   } catch (err) {
     return {
       ok: false,
-      reason: `MAIN 上下文检测 Gemini 会话失败: ${err?.message || String(err)}`
+      reason: isEn
+        ? `Failed to inspect Gemini session: ${err?.message || String(err)}`
+        : `MAIN 上下文检测 Gemini 会话失败: ${err?.message || String(err)}`
     };
   }
 }
@@ -130,12 +137,15 @@ async function extractGeminiTokenViaMainWorld() {
 /**
  * 检测 Gemini Web 登录状态并提取 SNlM0e (at 签名)
  */
-export async function checkGeminiWebSession() {
+export async function checkGeminiWebSession(lang = 'zh') {
+  const isEn = String(lang || '').toLowerCase().startsWith('en');
   if (cachedGeminiParams.atToken && Date.now() < cachedGeminiParams.expiresAt) {
     return {
       ok: true,
       ...cachedGeminiParams,
-      reason: 'Gemini Web 登录态已就绪 (支持 UI 模型切换与 DOM 桥接)'
+      reason: isEn
+        ? 'Gemini Web session ready (UI model switch & DOM bridge)'
+        : 'Gemini Web 登录态已就绪 (支持 UI 模型切换与 DOM 桥接)'
     };
   }
 
@@ -153,13 +163,15 @@ export async function checkGeminiWebSession() {
     clearTimeout(timer);
 
     if (resp.status === 403) {
-      return extractGeminiTokenViaMainWorld();
+      return extractGeminiTokenViaMainWorld(lang);
     }
 
     if (!resp.ok) {
       return {
         ok: false,
-        reason: `gemini.google.com 返回 HTTP ${resp.status}，请确认已登录 Google 账号`
+        reason: isEn
+          ? `gemini.google.com returned HTTP ${resp.status}; please verify your Google login.`
+          : `gemini.google.com 返回 HTTP ${resp.status}，请确认已登录 Google 账号`
       };
     }
 
@@ -174,28 +186,27 @@ export async function checkGeminiWebSession() {
       return {
         ok: true,
         ...cachedGeminiParams,
-        reason: 'Gemini Web 已就绪 (支持 4 Argon / 4 Hydrogen / 3.1 Pro 等模型切换)'
+        reason: isEn
+          ? 'Gemini Web ready (supports 4 Argon / 4 Hydrogen / 3.1 Pro switching)'
+          : 'Gemini Web 已就绪 (支持 4 Argon / 4 Hydrogen / 3.1 Pro 等模型切换)'
       };
     }
 
-    return extractGeminiTokenViaMainWorld();
+    return extractGeminiTokenViaMainWorld(lang);
   } catch (_err) {
-    return extractGeminiTokenViaMainWorld();
+    return extractGeminiTokenViaMainWorld(lang);
   }
 }
 
 /**
- * 在 gemini.google.com 标签页中切换指定模型并驱动官方输入框发送请求
- * @param {number} tabId
- * @param {string} promptText
- * @param {string} model 目标模型（如 '4 Argon' / '4 Hydrogen' / '3.1 Pro' / '3.5 Flash-Lite' / '4 Carbon' / 'auto'）
+ * 在 gemini.google.com 标签页中切换指定模型、自动附带截图并驱动官方输入框发送请求
  */
-async function triggerGeminiDomSendInTab(tabId, promptText, model = '4 Argon') {
+async function triggerGeminiDomSendInTab(tabId, promptText, model = '4 Argon', imageDataUrl = '') {
   const execResults = await chrome.scripting.executeScript({
     target: { tabId },
     world: 'MAIN',
-    args: [promptText, model],
-    func: async (textToSend, preferredModel) => {
+    args: [promptText, model, imageDataUrl || ''],
+    func: async (textToSend, preferredModel, imgDataUrl) => {
       try {
         const MODEL_ALIAS_MAP = {
           '3.5 flash-lite': ['3.5 flash-lite', 'quick answers'],
@@ -341,7 +352,48 @@ async function triggerGeminiDomSendInTab(tabId, promptText, model = '4 Argon') {
           }
         }
 
-        // 4. 向 Gemini Quill / RichText 编辑器注入文本
+        // 4. 若带有截图/分镜图，自动向 Gemini 编辑器派发 ClipboardEvent 粘贴或注入文件框
+        let imageAttached = false;
+        if (imgDataUrl && imgDataUrl.startsWith('data:image/')) {
+          try {
+            const resp = await fetch(imgDataUrl);
+            const blob = await resp.blob();
+            const ext = (blob.type || 'image/png').includes('jpeg') ? 'jpg' : 'png';
+            const file = new File([blob], `reverse-capture.${ext}`, { type: blob.type || 'image/png' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+
+            editorEl.focus();
+            const pasteEvt = new ClipboardEvent('paste', {
+              bubbles: true,
+              cancelable: true,
+              clipboardData: dt
+            });
+            editorEl.dispatchEvent(pasteEvt);
+            imageAttached = true;
+
+            const fileInput = document.querySelector('input[type="file"]');
+            if (fileInput) {
+              await new Promise((r) => setTimeout(r, 250));
+              const hasPreview = document.querySelector('uploader-file-preview, img[src^="blob:"], .file-preview');
+              if (!hasPreview) {
+                fileInput.files = dt.files;
+                fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+              }
+            }
+
+            // 等待缩略图挂载（最多 2.2s）
+            for (let w = 0; w < 10; w++) {
+              await new Promise((r) => setTimeout(r, 200));
+              const hasPreview = document.querySelector('uploader-file-preview, img[src^="blob:"], .file-preview');
+              if (hasPreview && w >= 2) break;
+            }
+          } catch (_imgErr) {
+            imageAttached = false;
+          }
+        }
+
+        // 5. 向 Gemini Quill / RichText 编辑器注入文本
         editorEl.focus();
         if (editorEl.tagName === 'TEXTAREA') {
           const setter = Object.getOwnPropertyDescriptor(window.HTMLTextAreaElement.prototype, 'value')?.set;
@@ -367,14 +419,19 @@ async function triggerGeminiDomSendInTab(tabId, promptText, model = '4 Argon') {
           }
         }
 
-        await new Promise((r) => setTimeout(r, 280));
+        await new Promise((r) => setTimeout(r, imageAttached ? 550 : 280));
 
-        // 5. 触发发送按钮或回车键
-        const sendBtn =
-          document.querySelector('button.send-button:not([disabled])') ||
-          document.querySelector('button[aria-label*="Send"]:not([disabled])') ||
-          document.querySelector('button[aria-label*="发送"]:not([disabled])') ||
-          document.querySelector('button[mattooltip*="Send"]:not([disabled])');
+        // 6. 触发发送按钮或回车键
+        let sendBtn = null;
+        for (let s = 0; s < 10; s++) {
+          sendBtn =
+            document.querySelector('button.send-button:not([disabled])') ||
+            document.querySelector('button[aria-label*="Send"]:not([disabled])') ||
+            document.querySelector('button[aria-label*="发送"]:not([disabled])') ||
+            document.querySelector('button[mattooltip*="Send"]:not([disabled])');
+          if (sendBtn) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
 
         if (sendBtn) {
           sendBtn.click();
@@ -391,7 +448,7 @@ async function triggerGeminiDomSendInTab(tabId, promptText, model = '4 Argon') {
           );
         }
 
-        return { ok: true, modelStatus };
+        return { ok: true, modelStatus, imageAttached };
       } catch (err) {
         return { ok: false, error: err?.message || String(err) };
       }
@@ -634,16 +691,17 @@ async function streamGeminiViaRpcFallback({ promptText, sessionRes, onChunk, sig
 /**
  * 调用 Gemini Web 流式生成逆向提示词（支持自动切换 UI 模型菜单：4 Argon / 4 Hydrogen / 3.1 Pro / 3.5 Flash-Lite / 4 Carbon）
  */
-export async function streamGeminiWeb({ compiledPrompt, model = '4 Argon', onChunk, signal }) {
-  const sessionRes = await checkGeminiWebSession();
+export async function streamGeminiWeb({ compiledPrompt, model = '4 Argon', onChunk, signal, lang = 'zh' }) {
+  const sessionRes = await checkGeminiWebSession(lang);
   if (!sessionRes.ok) {
-    throw new Error(sessionRes.reason || '未检测到 Gemini Web 登录态，请先在浏览器登录 https://gemini.google.com/app');
+    throw new Error(sessionRes.reason || 'Gemini Web session not found. Please sign in at https://gemini.google.com/app');
   }
 
   const tabId = await findOrCreateGeminiTab();
   const promptText = compiledPrompt.combinedPromptForWeb || compiledPrompt.userPrompt;
+  const imageDataUrl = compiledPrompt?.imageInfo?.hasValidBitmap ? compiledPrompt.imageInfo.dataUrl : '';
 
-  const triggerRes = await triggerGeminiDomSendInTab(tabId, promptText, model);
+  const triggerRes = await triggerGeminiDomSendInTab(tabId, promptText, model, imageDataUrl);
   if (!triggerRes.ok) {
     // 若选择了特定模型但切换失败（例如带🔒未解锁），直接报错，不静默回退到错误模型
     if (triggerRes.modelError) {

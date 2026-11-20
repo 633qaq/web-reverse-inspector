@@ -55,7 +55,8 @@ async function findOrCreateChatGPTTab() {
 /**
  * 检测 ChatGPT Web 登录状态（仅通过 chrome.cookies 无感检测，不主动发裸请求触发风控）
  */
-export async function checkChatGPTWebSession() {
+export async function checkChatGPTWebSession(lang = 'zh') {
+  const isEn = String(lang || '').toLowerCase().startsWith('en');
   try {
     const cookies = await chrome.cookies.getAll({ domain: 'chatgpt.com' });
     const hasSessionToken =
@@ -70,7 +71,9 @@ export async function checkChatGPTWebSession() {
       return {
         ok: true,
         accessToken: 'cookie-verified',
-        reason: 'ChatGPT Web 登录态已就绪 (零侵入 DOM 桥接模式)'
+        reason: isEn
+          ? 'ChatGPT Web session ready (non-invasive DOM bridge)'
+          : 'ChatGPT Web 登录态已就绪 (零侵入 DOM 桥接模式)'
       };
     }
 
@@ -97,32 +100,38 @@ export async function checkChatGPTWebSession() {
           ok: true,
           accessToken: data.accessToken,
           userEmail: cachedSession.userEmail,
-          reason: `ChatGPT Web 已连接 ${cachedSession.userEmail ? `(${cachedSession.userEmail})` : ''}`
+          reason: isEn
+            ? `ChatGPT Web connected${cachedSession.userEmail ? ` (${cachedSession.userEmail})` : ''}`
+            : `ChatGPT Web 已连接 ${cachedSession.userEmail ? `(${cachedSession.userEmail})` : ''}`
         };
       }
     }
 
     return {
       ok: false,
-      reason: '未检测到 chatgpt.com 登录态，请先在浏览器登录或切换 BYOK'
+      reason: isEn
+        ? 'No chatgpt.com session found. Sign in or switch to BYOK.'
+        : '未检测到 chatgpt.com 登录态，请先在浏览器登录或切换 BYOK'
     };
   } catch (_err) {
     return {
       ok: false,
-      reason: '请先在浏览器打开 https://chatgpt.com 登录账号'
+      reason: isEn
+        ? 'Please sign in at https://chatgpt.com first'
+        : '请先在浏览器打开 https://chatgpt.com 登录账号'
     };
   }
 }
 
 /**
- * 在 chatgpt.com 标签页中恢复原生环境、切换模型下拉框并驱动官方 ProseMirror 编辑器发送消息（零 Monkey-Patch）
+ * 在 chatgpt.com 标签页中恢复原生环境、切换模型下拉框、自动附带截图并驱动官方 ProseMirror 编辑器发送消息
  */
-async function triggerCleanDomSendInTab(tabId, promptText, model = 'GPT-6.2 Astra') {
+async function triggerCleanDomSendInTab(tabId, promptText, model = 'GPT-6.2 Astra', imageDataUrl = '') {
   const execResults = await chrome.scripting.executeScript({
     target: { tabId },
     world: 'MAIN',
-    args: [promptText, model],
-    func: async (textToSend, preferredModel) => {
+    args: [promptText, model, imageDataUrl || ''],
+    func: async (textToSend, preferredModel, imgDataUrl) => {
       try {
         // 1. 若当前标签页曾被旧版本脚本重写过 window.fetch，从同源干净 iframe 恢复原生 [native code] fetch
         if (window.__WRI_FETCH_TAP_INSTALLED__ || !Function.prototype.toString.call(window.fetch).includes('[native code]')) {
@@ -245,7 +254,51 @@ async function triggerCleanDomSendInTab(tabId, promptText, model = 'GPT-6.2 Astr
           };
         }
 
-        // 4. 使用标准 Selection + execCommand('insertText') 向 ProseMirror 注入文本（保持原生事件链完整性）
+        // 4. 若带有截图/分镜图，自动通过 DataTransfer / ClipboardEvent 贴图上传
+        let imageAttached = false;
+        if (imgDataUrl && imgDataUrl.startsWith('data:image/')) {
+          try {
+            const resp = await fetch(imgDataUrl);
+            const blob = await resp.blob();
+            const ext = (blob.type || 'image/png').includes('jpeg') ? 'jpg' : 'png';
+            const file = new File([blob], `reverse-capture.${ext}`, { type: blob.type || 'image/png' });
+            const dt = new DataTransfer();
+            dt.items.add(file);
+
+            // 优先注入页面文件上传控件，其次向编辑器派发 paste 事件
+            const fileInput =
+              document.querySelector('input[type="file"][accept*="image"]') ||
+              document.querySelector('input[type="file"]');
+            if (fileInput) {
+              fileInput.files = dt.files;
+              fileInput.dispatchEvent(new Event('change', { bubbles: true }));
+              imageAttached = true;
+            } else {
+              editorEl.focus();
+              const pasteEvt = new ClipboardEvent('paste', {
+                bubbles: true,
+                cancelable: true,
+                clipboardData: dt
+              });
+              editorEl.dispatchEvent(pasteEvt);
+              imageAttached = true;
+            }
+
+            // 温和等待图片上传缩略图就绪（最多 2.2s，不阻断后续发送）
+            for (let w = 0; w < 11; w++) {
+              await new Promise((r) => setTimeout(r, 200));
+              const readyBtn =
+                document.querySelector('button[data-testid="send-button"]:not([disabled])') ||
+                document.querySelector('button[aria-label*="Send"]:not([disabled])');
+              const hasThumb = document.querySelector('img[src^="blob:"], [data-testid*="attachment"]');
+              if (hasThumb && readyBtn && w >= 2) break;
+            }
+          } catch (_imgErr) {
+            imageAttached = false;
+          }
+        }
+
+        // 5. 使用标准 Selection + execCommand('insertText') 向 ProseMirror 注入文本（保持原生事件链完整性）
         editorEl.focus();
         if (editorEl.tagName === 'TEXTAREA') {
           const setter = Object.getOwnPropertyDescriptor(
@@ -274,14 +327,19 @@ async function triggerCleanDomSendInTab(tabId, promptText, model = 'GPT-6.2 Astr
           }
         }
 
-        await new Promise((r) => setTimeout(r, 280));
+        await new Promise((r) => setTimeout(r, imageAttached ? 550 : 280));
 
-        // 5. 触发发送按钮或回车键
-        const sendBtn =
-          document.querySelector('button[data-testid="send-button"]') ||
-          document.querySelector('button[aria-label*="Send"]') ||
-          document.querySelector('button[aria-label*="发送"]') ||
-          document.querySelector('form button[type="submit"]');
+        // 6. 触发发送按钮或回车键
+        let sendBtn = null;
+        for (let s = 0; s < 10; s++) {
+          sendBtn =
+            document.querySelector('button[data-testid="send-button"]:not([disabled])') ||
+            document.querySelector('button[aria-label*="Send"]:not([disabled])') ||
+            document.querySelector('button[aria-label*="发送"]:not([disabled])') ||
+            document.querySelector('form button[type="submit"]:not([disabled])');
+          if (sendBtn) break;
+          await new Promise((r) => setTimeout(r, 200));
+        }
 
         if (sendBtn && !sendBtn.disabled) {
           sendBtn.click();
@@ -298,7 +356,7 @@ async function triggerCleanDomSendInTab(tabId, promptText, model = 'GPT-6.2 Astr
           );
         }
 
-        return { ok: true, switchedModelInfo };
+        return { ok: true, switchedModelInfo, imageAttached };
       } catch (err) {
         return { ok: false, error: err?.message || String(err) };
       }
@@ -411,16 +469,17 @@ async function pollAssistantDomMarkdown(tabId) {
 /**
  * 调用 ChatGPT Web 流式生成逆向提示词（支持自动切换官方 UI 模型菜单：GPT-6.2 Astra / Sol / 6.1 / 6 等）
  */
-export async function streamChatGPTWeb({ compiledPrompt, model = 'GPT-6.2 Astra', onChunk, signal }) {
-  const sessionRes = await checkChatGPTWebSession();
+export async function streamChatGPTWeb({ compiledPrompt, model = 'GPT-6.2 Astra', onChunk, signal, lang = 'zh' }) {
+  const sessionRes = await checkChatGPTWebSession(lang);
   if (!sessionRes.ok) {
     throw new Error(sessionRes.reason);
   }
 
   const tabId = await findOrCreateChatGPTTab();
   const promptText = compiledPrompt.combinedPromptForWeb || compiledPrompt.userPrompt;
+  const imageDataUrl = compiledPrompt?.imageInfo?.hasValidBitmap ? compiledPrompt.imageInfo.dataUrl : '';
 
-  const triggerRes = await triggerCleanDomSendInTab(tabId, promptText, model);
+  const triggerRes = await triggerCleanDomSendInTab(tabId, promptText, model, imageDataUrl);
   if (!triggerRes.ok) {
     throw new Error(triggerRes.error || '无法在 chatgpt.com 触发发送');
   }

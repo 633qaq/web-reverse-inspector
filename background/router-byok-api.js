@@ -53,9 +53,27 @@ async function consumeSseStream(bodyStream, onDataLine, signal) {
 }
 
 /**
- * 解析 API 错误响应文本，输出人类可读的中文排障提示
+ * 规范化 OpenAI-Compatible API Endpoint（支持 DeepSeek / OpenRouter / SiliconFlow / Ollama 等自定义 Base URL）
+ * @param {string} [baseUrl]
+ * @returns {string}
  */
-async function extractReadableApiError(response, providerName) {
+export function resolveOpenAIChatEndpoint(baseUrl = '') {
+  const clean = String(baseUrl || '').trim().replace(/\/+$/, '');
+  if (!clean) return 'https://api.openai.com/v1/chat/completions';
+  if (/\/chat\/completions$/i.test(clean)) return clean;
+  if (/\/v\d+$/i.test(clean)) return `${clean}/chat/completions`;
+  return `${clean}/v1/chat/completions`;
+}
+
+function isLocalhostEndpoint(url = '') {
+  return /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?(\/|$)/i.test(String(url).trim());
+}
+
+/**
+ * 解析 API 错误响应文本，输出人类可读的双语排障提示
+ */
+async function extractReadableApiError(response, providerName, lang = 'zh') {
+  const isEn = String(lang || '').toLowerCase().startsWith('en');
   let detail = '';
   try {
     const text = await response.text();
@@ -66,19 +84,27 @@ async function extractReadableApiError(response, providerName) {
       detail = text.slice(0, 240);
     }
   } catch (_e) {
-    detail = response.statusText || '未知网络错误';
+    detail = response.statusText || (isEn ? 'Unknown network error' : '未知网络错误');
   }
 
   if (response.status === 400) {
-    return `${providerName} 请求参数错误 (HTTP 400): ${detail}`;
+    return isEn
+      ? `${providerName} bad request (HTTP 400): ${detail}`
+      : `${providerName} 请求参数错误 (HTTP 400): ${detail}`;
   }
   if (response.status === 401 || response.status === 403) {
-    return `${providerName} API Key 鉴权失败或无权限 (HTTP ${response.status}): 请在右上角「设置」检查密钥是否正确。(${detail})`;
+    return isEn
+      ? `${providerName} authentication failed (HTTP ${response.status}): check your API key in Settings. (${detail})`
+      : `${providerName} API Key 鉴权失败或无权限 (HTTP ${response.status}): 请在右上角「设置」检查密钥是否正确。(${detail})`;
   }
   if (response.status === 429) {
-    return `${providerName} 请求频率或配额超限 (HTTP 429): ${detail}`;
+    return isEn
+      ? `${providerName} rate limit or quota exceeded (HTTP 429): ${detail}`
+      : `${providerName} 请求频率或配额超限 (HTTP 429): ${detail}`;
   }
-  return `${providerName} 接口异常 (HTTP ${response.status}): ${detail}`;
+  return isEn
+    ? `${providerName} request error (HTTP ${response.status}): ${detail}`
+    : `${providerName} 接口异常 (HTTP ${response.status}): ${detail}`;
 }
 
 /**
@@ -87,13 +113,19 @@ async function extractReadableApiError(response, providerName) {
  */
 export async function streamGeminiByok({
   apiKey,
-  model = 'gemini-2.5-pro',
+  model = 'gemini-4-argon',
   compiledPrompt,
   onChunk,
-  signal
+  signal,
+  lang = 'zh'
 }) {
+  const isEn = String(lang || '').toLowerCase().startsWith('en');
   if (!apiKey || !apiKey.trim()) {
-    throw new Error('未配置 Google AI Studio API Key，请点击右上角 ⚙️ 设置面板填入密钥。');
+    throw new Error(
+      isEn
+        ? 'Google AI Studio API Key is not configured. Click ⚙️ Settings to enter your key.'
+        : '未配置 Google AI Studio API Key，请点击右上角 ⚙️ 设置面板填入密钥。'
+    );
   }
 
   const cleanKey = apiKey.trim();
@@ -156,7 +188,7 @@ export async function streamGeminiByok({
 
   if (!response.ok) {
     if (signal) signal.removeEventListener('abort', onExternalAbort);
-    const errMsg = await extractReadableApiError(response, 'Gemini API');
+    const errMsg = await extractReadableApiError(response, 'Gemini API', lang);
     throw new Error(errMsg);
   }
 
@@ -203,18 +235,27 @@ export async function streamGeminiByok({
  */
 export async function streamOpenAIByok({
   apiKey,
-  model = 'gpt-4o',
+  baseUrl = '',
+  model = 'gpt-6.2-astra',
   compiledPrompt,
   onChunk,
-  signal
+  signal,
+  lang = 'zh'
 }) {
-  if (!apiKey || !apiKey.trim()) {
-    throw new Error('未配置 OpenAI API Key，请点击右上角 ⚙️ 设置面板填入密钥。');
+  const endpoint = resolveOpenAIChatEndpoint(baseUrl);
+  const isLocal = isLocalhostEndpoint(endpoint);
+  const cleanKey = String(apiKey || '').trim() || (isLocal ? 'local-ollama' : '');
+  const isEn = String(lang || '').toLowerCase().startsWith('en');
+
+  if (!cleanKey) {
+    throw new Error(
+      isEn
+        ? 'OpenAI API Key is not configured. Click ⚙️ Settings to enter your key (or point Base URL to localhost).'
+        : '未配置 OpenAI API Key，请点击右上角 ⚙️ 设置面板填入密钥（本地 Ollama 等接口可填 localhost Base URL 免密钥）。'
+    );
   }
 
-  const cleanKey = apiKey.trim();
-  const cleanModel = (model || 'gpt-4o').trim();
-  const endpoint = 'https://api.openai.com/v1/chat/completions';
+  const cleanModel = (model || 'gpt-6.2-astra').trim();
 
   const userContent = [
     {
@@ -244,7 +285,7 @@ export async function streamOpenAIByok({
       },
       {
         role: 'user',
-        content: userContent
+        content: userContent.length === 1 ? userContent[0].text : userContent
       }
     ]
   };
@@ -280,7 +321,7 @@ export async function streamOpenAIByok({
 
   if (!response.ok) {
     if (signal) signal.removeEventListener('abort', onExternalAbort);
-    const errMsg = await extractReadableApiError(response, 'OpenAI API');
+    const errMsg = await extractReadableApiError(response, 'OpenAI API', lang);
     throw new Error(errMsg);
   }
 
@@ -329,6 +370,7 @@ export async function streamOpenAIByok({
  */
 export async function streamByokGeneration(options) {
   const { channel, config = {}, compiledPrompt, onChunk, signal } = options;
+  const lang = config.lang || 'zh';
 
   if (channel === 'byok-gemini') {
     return streamGeminiByok({
@@ -336,19 +378,22 @@ export async function streamByokGeneration(options) {
       model: config.geminiModel || 'gemini-4-argon',
       compiledPrompt,
       onChunk,
-      signal
+      signal,
+      lang
     });
   }
 
   if (channel === 'byok-openai') {
     return streamOpenAIByok({
       apiKey: config.openaiApiKey,
+      baseUrl: config.openaiBaseUrl || '',
       model: config.openaiModel || 'gpt-6.2-astra',
       compiledPrompt,
       onChunk,
-      signal
+      signal,
+      lang
     });
   }
 
-  throw new Error(`不支持的 BYOK 通道类型: ${channel}`);
+  throw new Error(`Unsupported BYOK channel: ${channel}`);
 }

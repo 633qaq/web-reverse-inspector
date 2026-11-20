@@ -27,13 +27,92 @@ async function initSidePanelBehavior() {
   }
 }
 
+/**
+ * 初始化右键菜单（支持随当前语言动态刷新标题）
+ */
+async function setupContextMenus(lang = '') {
+  try {
+    if (!chrome.contextMenus) return;
+    const cfg = await getStoredUserConfig();
+    const locale = normalizeLang(lang || cfg.lang);
+    const isEn = locale === 'en';
+
+    await chrome.contextMenus.removeAll();
+    chrome.contextMenus.create({
+      id: 'wri_root',
+      title: '⚡ Web Reverse Inspector',
+      contexts: ['page', 'selection', 'image', 'link']
+    });
+    chrome.contextMenus.create({
+      id: 'wri_hybrid',
+      parentId: 'wri_root',
+      title: isEn ? '🔗 Hybrid Reverse Element (DOM + Crop)' : '🔗 混合逆向当前元素 (DOM + 截图)',
+      contexts: ['page', 'selection', 'image', 'link']
+    });
+    chrome.contextMenus.create({
+      id: 'wri_recorder',
+      parentId: 'wri_root',
+      title: isEn ? '🎬 Record 4s Motion Storyboard' : '🎬 录制 4 秒动态分镜',
+      contexts: ['page', 'selection', 'image', 'link']
+    });
+    chrome.contextMenus.create({
+      id: 'wri_cropper',
+      parentId: 'wri_root',
+      title: isEn ? '📸 Region Marquee Screenshot' : '📸 局部框选高清截图',
+      contexts: ['page', 'selection', 'image', 'link']
+    });
+  } catch (err) {
+    console.warn('[WRI ServiceWorker] 注册右键菜单失败:', err);
+  }
+}
+
+async function triggerQuickCaptureFromBrowser(mode, tab) {
+  try {
+    if (chrome.sidePanel?.open && tab?.windowId) {
+      await chrome.sidePanel.open({ windowId: tab.windowId });
+    }
+  } catch (_err) {
+    // 某些上下文下 open 失败不阻断采集注入
+  }
+  const cfg = await getStoredUserConfig();
+  await startContentCaptureInActiveTab(mode, cfg.lang);
+}
+
 chrome.runtime.onInstalled.addListener(() => {
   initSidePanelBehavior();
+  setupContextMenus();
 });
 
 chrome.runtime.onStartup.addListener(() => {
   initSidePanelBehavior();
+  setupContextMenus();
 });
+
+if (chrome.contextMenus?.onClicked) {
+  chrome.contextMenus.onClicked.addListener((info, tab) => {
+    const modeMap = {
+      wri_hybrid: 'hybrid',
+      wri_recorder: 'recorder',
+      wri_cropper: 'cropper'
+    };
+    const mode = modeMap[info.menuItemId];
+    if (mode) {
+      triggerQuickCaptureFromBrowser(mode, tab).catch(console.error);
+    }
+  });
+}
+
+if (chrome.commands?.onCommand) {
+  chrome.commands.onCommand.addListener(async (command) => {
+    const tabs = await chrome.tabs.query({ active: true, lastFocusedWindow: true });
+    const activeTab = tabs?.[0];
+    if (command === 'start-hybrid-inspector') {
+      await triggerQuickCaptureFromBrowser('hybrid', activeTab);
+    } else if (command === 'start-region-cropper') {
+      await triggerQuickCaptureFromBrowser('cropper', activeTab);
+    }
+  });
+}
 
 initSidePanelBehavior();
 
@@ -48,7 +127,9 @@ async function getStoredUserConfig() {
     geminiApiKey: '',
     geminiModel: 'gemini-4-argon',
     openaiApiKey: '',
+    openaiBaseUrl: '',
     openaiModel: 'gpt-6.2-astra',
+    customInstruction: '',
     modelSchemaVersion: 2
   };
   try {
@@ -526,11 +607,11 @@ async function createMockCapturePayload(mode = 'hybrid') {
  * 未调用模型时的输出：直接给出可发送给外部 AI 的复刻 Prompt。
  * 不编造任何参数，也不再用规则模板拼凑"复刻代码"（那类代码无法可信还原原网页，反而误导用户）。
  */
-function buildOfflineFallbackMarkdown(capture = {}) {
+function buildOfflineFallbackMarkdown(capture = {}, options = {}) {
   if (!capture || capture.pageUrl?.includes('(Sample)')) {
     return buildDefaultHolographicMarkdown();
   }
-  return compileReversePrompt(capture).combinedPromptForWeb;
+  return compileReversePrompt(capture, options).combinedPromptForWeb;
 }
 
 /**
@@ -743,7 +824,7 @@ async function streamTextDirectToSidePanel(fullText, controller) {
 /**
  * 本地高精度逆向编译器流式推送（通道提示发送至顶部状态栏，不污染 Prompt 正文）
  */
-async function streamOfflineFallbackToSidePanel(capturePayload, fallbackReason, controller, lang = 'zh') {
+async function streamOfflineFallbackToSidePanel(capturePayload, fallbackReason, controller, lang = 'zh', customInstruction = '') {
   const locale = normalizeLang(lang);
   if (fallbackReason) {
     const suspectHint = capturePayload?.screenshotSuspect ? t('swFallbackSuspect', {}, locale) : '';
@@ -753,7 +834,7 @@ async function streamOfflineFallbackToSidePanel(capturePayload, fallbackReason, 
     });
   }
 
-  const fullText = buildOfflineFallbackMarkdown(capturePayload);
+  const fullText = buildOfflineFallbackMarkdown(capturePayload, { lang: locale, customInstruction });
   await streamTextDirectToSidePanel(fullText, controller);
 }
 
@@ -790,7 +871,13 @@ async function dispatchCompiledPromptStream({ compiledPrompt, userConfig, mode =
 
   const runFallback = async (reason) => {
     if (capturePayload) {
-      await streamOfflineFallbackToSidePanel(capturePayload, reason, controller, locale);
+      await streamOfflineFallbackToSidePanel(
+        capturePayload,
+        reason,
+        controller,
+        locale,
+        config.customInstruction || ''
+      );
       return;
     }
     if (reason) {
@@ -805,7 +892,12 @@ async function dispatchCompiledPromptStream({ compiledPrompt, userConfig, mode =
   try {
     if (channel === 'byok-gemini' || channel === 'byok-openai') {
       const hasGeminiKey = channel === 'byok-gemini' && config.geminiApiKey && config.geminiApiKey.trim().length > 8;
-      const hasOpenAIKey = channel === 'byok-openai' && config.openaiApiKey && config.openaiApiKey.trim().length > 8;
+      const isLocalOpenai =
+        channel === 'byok-openai' &&
+        /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?(\/|$)/i.test(String(config.openaiBaseUrl || '').trim());
+      const hasOpenAIKey =
+        channel === 'byok-openai' &&
+        (isLocalOpenai || (config.openaiApiKey && config.openaiApiKey.trim().length > 8));
 
       if (!hasGeminiKey && !hasOpenAIKey) {
         const keyName = channel === 'byok-gemini' ? 'Google AI Studio Key' : 'OpenAI API Key';
@@ -835,7 +927,8 @@ async function dispatchCompiledPromptStream({ compiledPrompt, userConfig, mode =
         compiledPrompt,
         model: config.webChatgptModel || 'GPT-6.2 Astra',
         onChunk,
-        signal: controller.signal
+        signal: controller.signal,
+        lang: locale
       });
       if (!controller.signal.aborted) {
         await sendRuntimeMessageSafe({
@@ -851,7 +944,8 @@ async function dispatchCompiledPromptStream({ compiledPrompt, userConfig, mode =
         compiledPrompt,
         model: config.webGeminiModel || '4 Argon',
         onChunk,
-        signal: controller.signal
+        signal: controller.signal,
+        lang: locale
       });
       if (!controller.signal.aborted) {
         await sendRuntimeMessageSafe({
@@ -886,10 +980,14 @@ async function dispatchCompiledPromptStream({ compiledPrompt, userConfig, mode =
  * 网页逆向任务调度：编译元提示词并进入统一流式路由
  */
 async function dispatchReverseStream(capturePayload, userConfig) {
-  const compiledPrompt = compileReversePrompt(capturePayload);
+  const config = userConfig || (await getStoredUserConfig());
+  const compiledPrompt = compileReversePrompt(capturePayload, {
+    lang: config.lang,
+    customInstruction: config.customInstruction || ''
+  });
   return dispatchCompiledPromptStream({
     compiledPrompt,
-    userConfig,
+    userConfig: config,
     mode: capturePayload?.captureMode || 'hybrid',
     capturePayload
   });
@@ -915,13 +1013,23 @@ async function evaluateChannelStatus(config = {}) {
   }
 
   if (channel === 'byok-openai') {
-    const hasKey = Boolean(config.openaiApiKey && config.openaiApiKey.trim().length > 8);
+    const customBase = String(config.openaiBaseUrl || '').trim();
+    const isLocal = /^https?:\/\/(localhost|127\.0\.0\.1|0\.0\.0\.0)(:\d+)?(\/|$)/i.test(customBase);
+    const hasKey = isLocal || Boolean(config.openaiApiKey && config.openaiApiKey.trim().length > 8);
     const model = config.openaiModel || 'gpt-6.2-astra';
+    let hostLabel = 'OpenAI';
+    if (customBase) {
+      try {
+        hostLabel = new URL(customBase).host || 'Custom API';
+      } catch (_e) {
+        hostLabel = 'Custom API';
+      }
+    }
     return {
       ready: hasKey,
       badgeText: hasKey ? t('swReadyByokOpenaiBadge', {}, locale) : t('swNeedByokOpenaiBadge', {}, locale),
       detail: hasKey
-        ? t('swReadyByokOpenaiDetail', { model }, locale)
+        ? t('swReadyByokOpenaiDetail', { model: `${hostLabel} · ${model}` }, locale)
         : t('swNeedByokOpenaiDetail', {}, locale)
     };
   }
@@ -934,7 +1042,7 @@ async function evaluateChannelStatus(config = {}) {
         Array.isArray(cookies) &&
         cookies.some((c) => c.name.includes('session-token') || c.name === '_puid');
       if (hasSessionCookie) {
-        const sessionCheck = await checkChatGPTWebSession();
+        const sessionCheck = await checkChatGPTWebSession(locale);
         if (sessionCheck.ok) {
           return {
             ready: true,
@@ -954,7 +1062,7 @@ async function evaluateChannelStatus(config = {}) {
         detail: t('swChatgptNeedLoginDetail', { model: selectedChatgptModel }, locale)
       };
     } catch (_err) {
-      const fallback = await checkChatGPTWebSession();
+      const fallback = await checkChatGPTWebSession(locale);
       return {
         ready: Boolean(fallback.ok),
         badgeText: fallback.ok ? t('swChatgptWebReady', {}, locale) : t('swChatgptNeedLogin', {}, locale),
@@ -971,7 +1079,7 @@ async function evaluateChannelStatus(config = {}) {
         Array.isArray(cookies) &&
         cookies.some((c) => c.name === 'SID' || c.name === '__Secure-1PSID');
       if (hasSid) {
-        const geminiCheck = await checkGeminiWebSession();
+        const geminiCheck = await checkGeminiWebSession(locale);
         if (geminiCheck.ok) {
           return {
             ready: true,
@@ -991,7 +1099,7 @@ async function evaluateChannelStatus(config = {}) {
         detail: t('swGeminiNeedLoginDetail', { model: selectedGeminiModel }, locale)
       };
     } catch (_err) {
-      const fallback = await checkGeminiWebSession();
+      const fallback = await checkGeminiWebSession(locale);
       return {
         ready: Boolean(fallback.ok),
         badgeText: fallback.ok ? t('swGeminiWebReady', {}, locale) : t('swGeminiNeedLogin', {}, locale),
@@ -1020,7 +1128,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
       switch (message.type) {
         case 'CHECK_CHANNEL_STATUS': {
-          const status = await evaluateChannelStatus(message.config || {});
+          const cfg = message.config || {};
+          if (cfg.lang) {
+            setupContextMenus(cfg.lang).catch(() => {});
+          }
+          const status = await evaluateChannelStatus(cfg);
           sendResponse({ ok: true, status });
           break;
         }

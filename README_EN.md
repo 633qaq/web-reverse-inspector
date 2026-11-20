@@ -1,10 +1,12 @@
 <div align="center">
 
+<img src="./assets/hero-banner.svg" alt="Web Reverse Inspector v2.0 Banner" width="100%" />
+
 # ⚡ Web Reverse Inspector
 
-**A 100% Client-Side Chrome Extension (Manifest V3) for Full-Layer Web UI/Effect Reverse Engineering & High-Fidelity Bidirectional PPTX ⇄ HTML Conversion**
+**100% Client-Side Chrome Extension (Manifest V3) for Full-Layer Web UI/Motion Reverse Engineering & Bidirectional High-Fidelity PPTX ⇄ HTML Conversion**
 
-[![Version](https://img.shields.io/badge/version-v1.5.0-0ea5e9?style=flat-square)](./CHANGELOG.md)
+[![Version](https://img.shields.io/badge/version-v2.0.0-0ea5e9?style=flat-square)](./CHANGELOG.md)
 [![Bilingual UI](https://img.shields.io/badge/UI-English%20%2F%20%E4%B8%AD%E6%96%87-ec4899?style=flat-square)](#key-features)
 [![Manifest V3](https://img.shields.io/badge/Chrome-Manifest%20V3-10b981?style=flat-square)](#quick-installation)
 [![Zero Dependencies](https://img.shields.io/badge/dependencies-0%20(Vanilla%20ES%20Modules)-6366f1?style=flat-square)](#architecture)
@@ -18,44 +20,41 @@
 
 ## ✨ Overview
 
-**Web Reverse Inspector** is a **pure client-side, zero-backend, zero-build-step** Chrome SidePanel extension built with Vanilla ES Modules, HTML5, and CSS3. Simply load the folder directly via Chrome `Load unpacked`—no Webpack, Vite, or server required.
-
-It delivers two end-to-end reverse-engineering & creation pipelines:
+**Web Reverse Inspector v2.0** is a **pure client-side, zero-backend, zero-build-step** Chrome SidePanel extension built with Vanilla ES Modules, HTML5, and CSS3—complete with official icons, instant English ⇄ Chinese UI switching, and three end-to-end pipelines:
 
 1. **🌐 Full-Layer Web UI & Motion Reverse Engineering (95%+ Fidelity)**:
-   Stop guessing layouts from raw screenshots. Inspect elements inside an isolated Shadow DOM, pierce transparent overlays & open Web Components (`shadowRoot`), run full-region multi-layer layout scans (`scanRegionLayout`), record **4-second multi-node interactions with 2×2 dynamic storyboards**, and capture high-DPI cropped PNGs to compile anti-hallucination AI replication prompts—with live streaming previews in a sandboxed iframe.
-2. **📽️ Bidirectional PPTX ⇄ HTML High-Fidelity Engine**:
-   - **`.pptx` → 95%+ Replication Prompt & 1:1 HTML5 Deck**: Powered by a zero-dependency ZIP engine and a 4-level OOXML inheritance parser (`Theme → SlideMaster → SlideLayout → Slide`), extracting theme color transforms (`lumMod/lumOff/tint/shade/satMod/alpha`), exact EMU coordinates, recursive group shapes, vector paths, merged tables, chart summaries, embedded media, animations, and speaker notes.
-   - **HTML Deck Preview Confirmation → Editable `.pptx` One-Click Export**: Preview any HTML slide deck inside the Sandbox (whether locally rendered 1:1 from PPTX, refined/created by AI streaming, or reverse-engineered from the web). Once satisfied, click **【📊 Confirm & Export `.pptx`】** to measure real browser layout via a `postMessage` probe and package a clean, native, editable `.pptx` file compatible with **Microsoft PowerPoint, WPS Office, and Apple Keynote**.
+   Capture live web components inside an isolated Shadow DOM, pierce open Web Components (`shadowRoot`), run full-region layer scans (`scanRegionLayout`), record **4-second multi-node interactions with 2×2 dynamic storyboards**, and trigger instantly via browser context menus or global shortcuts (`Alt+Shift+I` / `Alt+Shift+C`). Compiles unbiased bilingual prompts with custom rewrite directives and automatic screenshot attachment for web AI sessions.
+2. **📽️ Local PPTX 95%+ Parsing & AI Restyling**:
+   Zero-dependency native ZIP reader + **4-level OOXML inheritance parser (`Theme → SlideMaster → SlideLayout → Slide`)** supporting bar/line/pie SVG charts, theme color transforms, merged tables, animations, and speaker notes—outputting 95%+ prompts (with custom rewrite/restyle directives) and 1:1 HTML5 slide decks.
+3. **📄 Any HTML → Native Editable `.pptx` Export Loop**:
+   Includes a dedicated **「📄 HTML → PPTX」** workbench! Drop or paste any single-file HTML deck (from local PPTX parsing, AI streaming, merged history slides, or external tools like **Claude / Cursor / DeepSeek**), preview it in the Sandbox with **✏️ inline live text editing** and **↗ fullscreen tab view**, then export a clean, editable `.pptx` file for **PowerPoint, WPS Office, and Keynote**.
 
 ---
 
 ## 🚀 Key Features
 
-### 1. Dual-Modal Web Feature Capture (Shadow DOM Isolated)
-- **🎯 Shadow DOM Inspector**: Non-intrusive highlight box & badge tagging (`Transition`, `Anim`, `Glass`, `3D/Transform`, `ShadowDOM`, `Canvas/Media`), piercing transparent overlays and open `shadowRoot` trees.
-- **🧩 Full-Region Layer Scanner (`scanRegionLayout`)**: Enumerates background `<video>` / `<canvas>`, color containers, and foreground controls with exact relative percentage coordinates and aggregated button styles.
-- **🎬 4-Second Dynamic Storyboard Recorder**: Tracks up to 70 interactive nodes via `MutationObserver` + `rAF`, mouse trajectories, and scroll deltas, stitching 4 timestamped keyframes into a **2×2 Storyboard PNG** via `OffscreenCanvas`.
-- **📸 Region Cropper & Solid-Color Guard**: Crosshair marquee cropping with automatic dominant-color anomaly warnings (>90% single color).
-- **🧹 Noise-Filtered CSS & Cross-Origin `@keyframes`**: Strips verbose browser defaults and fetches cross-origin stylesheets in the background worker to recover complete keyframe animations.
+### 1. Dual-Modal Web Capture & Quick Entry
+- **🎯 Shadow DOM Inspector & Full-Layer Scanner (`scanRegionLayout`)**: Pierces transparent overlays and open `shadowRoot` trees to capture background `<video>` / `<canvas>`, surfaces, foreground controls, noise-filtered CSS, and cross-origin `@keyframes`.
+- **🎬 4-Second Dynamic Storyboard**: Tracks up to 70 interactive nodes, pointer trajectories, and scroll deltas into an annotated **2×2 Storyboard PNG**.
+- **⌨️ Context Menu & Global Shortcuts**: Right-click any webpage to capture directly, or press `Alt+Shift+I` (Hybrid Inspector) / `Alt+Shift+C` (Region Crop).
 
-### 2. PPTX 95%+ Replication & HTML ⇄ PPTX Bidirectional Pipeline
-- **📦 Zero-Dependency Native ZIP Reader & Writer (`utils/zip-lite.js`)**: Built on browser-native `DecompressionStream('deflate-raw')` / `CompressionStream('deflate-raw')` and IEEE CRC-32, supporting Data Descriptors and UTF-8 entry names.
-- **🧬 4-Level OOXML Inheritance Parser (`utils/pptx-parser.js`)**: Resolves `Theme → SlideMaster → SlideLayout → Slide`, color maps/modifiers, recursive `<p:grpSp>` transforms, `<a:prstGeom>` / `<a:custGeom>`, image `srcRect` crops, merged `<a:tbl>` tables, chart summaries, transitions, timing animations, and speaker notes.
-- **🎞️ 1:1 Single-File HTML5 Slide Renderer (`utils/pptx-html-renderer.js`)**: Aspect-ratio-locked scalable stage, embedded Base64 media, keyboard navigation (`←/→/Space`), fullscreen mode, speaker notes drawer, and clean offline `.html` export.
-- **📊 Real-Layout Sandbox Probe + Native `.pptx` Exporter (`utils/html-slide-extractor.js` & `utils/pptx-exporter.js`)**:
-  - Injects a lightweight measurement probe only inside the preview sandbox (`iframe[sandbox="allow-scripts"]`) without touching copied or exported `.html` code.
-  - Converts coordinates, multi-run rich text (`px → pt`, explicit `<a:latin>` + `<a:ea>` font tags to prevent CJK font fallback), solid & multi-stop linear/radial gradients (mathematically reversible CSS-angle ↔ OOXML `ang`), rounded rectangles/ellipses, borders, outer shadows, rotations, merged native tables (`colspan`/`rowspan`), cropped/deduplicated images, and speaker notes into **native editable PowerPoint objects**.
-  - Rasterizes complex `<svg>` graphics/charts and `<canvas>` visuals at **2x crisp transparent PNG** to prevent cross-platform vector distortion.
+### 2. Bidirectional PPTX ⇄ HTML Engine (Supercharged in v2.0)
+- **🧬 4-Level OOXML Parser + Bar / Line / Pie SVG Charts**: Resolves Master/Layout/Theme color modifiers, recursive group shapes, merged tables, transitions, timing animations, and speaker notes.
+- **📄 Direct「HTML → PPTX」Workbench**: Drag & drop `.html` files or paste raw HTML slide code directly into Sandbox preview and convert to editable `.pptx`.
+- **✏️ Inline Live Text Editing + ↗ Fullscreen Tab View**: Toggle `✏️ Edit` to click and fix any headline or data directly in the preview; edits sync automatically to `.pptx`, `.html`, and fullscreen view.
+- **⚙️ Dual Export Modes + Cross-OS Safe Font Mapping**:
+  - **Standard Native Editable (Default)**: Rich text, multi-stop gradients, rounded shapes, borders, shadows, rotations, merged tables, cropped/deduplicated images, and notes export as native editable PowerPoint objects; `<svg>` & `<canvas>` rasterize at 2x transparent PNG.
+  - **Hybrid Visual Fidelity Mode**: Rasterizes heavy `backdrop-filter`/filtered card surfaces at 2x while keeping foreground text 100% natively editable.
+  - **Safe Font Mapping**: Maps `PingFang SC / Noto Sans SC / Inter / JetBrains Mono` to universal `Microsoft YaHei / Arial / Consolas` to prevent wrapping shifts across OSes.
 
-### 3. Serverless Dual-Track AI Model Router
-- **🌐 Official Web Subscription Bridge (Zero Monkey-Patching)**: Reuses your active browser sessions for **ChatGPT Web** (supporting latest menu models such as GPT-6.2 Astra) and **Gemini Web** (supporting 4 Argon, 4 Carbon, 4 Hydrogen, 3.1 Pro, with lock-state detection and RPC fallback).
-- **🔑 Bring Your Own Key (BYOK) Direct SSE**: Native multimodal streaming to Google AI Studio (Gemini API) and OpenAI API, with keys stored strictly locally in `chrome.storage.local`.
-- **📋 Offline Pure Prompt Fallback**: Works completely offline with zero account/API required—outputs structured replication prompts plus one-click screenshot & prompt clipboard export.
+### 3. Universal AI Routing + Custom Directives + Local History Merge
+- **🎯 Custom AI Rewrite / Restyle Directive Box**: Includes quick preset chips (`1:1 Exact`, `Swap Copy`, `Light Biz`, `Tighten Copy`) with unbiased bilingual prompt compilation.
+- **🌐 Web Session Auto-Image Attachment**: Automatically attaches captured screenshots/storyboards to **ChatGPT Web** and **Gemini Web** via `DataTransfer` / `ClipboardEvent('paste')` (with graceful fallback).
+- **🔑 BYOK Custom Base URL**: Supports Google AI Studio plus any OpenAI-Compatible endpoint (**DeepSeek, OpenRouter, SiliconFlow, custom proxies, and keyless local Ollama**).
+- **🕘 IndexedDB Local History & Multi-Slide Merge**: Automatically stores the last 25 sessions locally—restore any session in one click, or select multiple single-slide items to **merge into a multi-slide HTML deck & export as a multi-slide `.pptx`**!
 
-### 4. Built-in Bilingual UI (English ⇄ 简体中文 Instant Switch)
-- **🌍 Auto-Detect + One-Click Toggle**: Ships with native Chrome `_locales` (`en` / `zh_CN`) manifest localization, auto-detects browser UI language on first launch, and lets you switch instantly between **English** and **简体中文** via the top-right **`中文 / EN`** button (persisted in `chrome.storage.local`).
-- **End-to-End Coverage**: Covers the entire SidePanel UI, model menus, channel status messages, Shadow DOM in-page capture banners (inspector, 4s recorder, region cropper), and the 1:1 HTML deck player toolbar.
+### 4. Built-in Bilingual Runtime UI (English ⇄ 简体中文)
+- Ships with native Chrome `_locales` (`en` / `zh_CN`) and **226 matched bilingual keys**. Auto-detects Chrome language and toggles instantly via the top-right **`中文 / EN`** button.
 
 ---
 
@@ -63,64 +62,45 @@ It delivers two end-to-end reverse-engineering & creation pipelines:
 
 ```mermaid
 flowchart LR
-    A["🌐 Target Web Page\n(Inspector / 4s Storyboard / Cropper)"] --> C["Prompt Compiler\n& Dual-Track AI Router"]
-    B["📂 Local .pptx File\n(4-Level OOXML Parser)"] --> C
-    B --> D["1:1 Single-File HTML5 Deck"]
-    C -->|"Streamed / Refined HTML"| E["👁️ Isolated Sandbox Preview\n(Verify Slides Visually)"]
-    D --> E
+    A["🌐 Target Web Page\n(Inspector / 4s Storyboard / Shortcuts)"] --> D["Unbiased Bilingual Prompt Compiler\n+ Custom Directive & AI Router"]
+    B["📂 Local .pptx File\n(4-Level OOXML Parser)"] --> D
+    B --> E["👁️ Isolated Sandbox Preview\n(✏️ Live Edit / ↗ Fullscreen Tab)"]
+    C["📄 Any .html File or Code\n(Claude / Cursor / DeepSeek)"] --> E
+    D -->|"Web Auto-Image / BYOK SSE"| E
+    H["🕘 IndexedDB History\n(Multi-Slide Merge)"] --> E
     E -->|"📥 Export Clean .html"| F["Offline HTML Deck"]
-    E -->|"📊 postMessage Layout Probe\n+ Native OOXML Packager"| G["Editable .pptx File\n(PowerPoint / WPS / Keynote)"]
+    E -->|"📊 Live Layout Probe + Safe Fonts\n+ Native/Hybrid OOXML Packager"| G["Editable .pptx File\n(PowerPoint / WPS / Keynote)"]
 ```
 
 ---
 
 ## 📦 Quick Installation
 
-No `npm install`, no bundler—load directly in Chrome / Edge in 30 seconds:
+Zero build step—load directly in Chrome / Edge in 30 seconds:
 
-1. **Get the source** (pick one):
-   - Download and unzip `web-reverse-inspector-v1.5.0.zip` from [Releases](https://github.com/633qaq/web-reverse-inspector/releases); or
-   - Clone the repository:
+1. **Get the extension**:
+   - Download and unzip `web-reverse-inspector-v2.0.0.zip` from [Releases](https://github.com/633qaq/web-reverse-inspector/releases); or
+   - Clone this repository:
      ```bash
      git clone https://github.com/633qaq/web-reverse-inspector.git
      ```
-2. Navigate to `chrome://extensions/`.
-3. Enable **Developer mode** in the top-right corner.
-4. Click **Load unpacked** and select the folder containing `manifest.json`.
-5. Click the extension icon in your toolbar to open the persistent SidePanel.
+2. Open `chrome://extensions/` and enable **Developer mode**.
+3. Click **Load unpacked** and select the folder containing `manifest.json`.
+4. Click the toolbar icon to open the SidePanel, or press `Alt+Shift+I` / right-click any webpage!
 
 ---
 
 ## ⚠️ Technical Boundaries & Transparency
 
-| Category | Behavior & Format Limits |
+| Category | Behavior & Limits |
 | :--- | :--- |
-| **Native Editable PPTX Objects** | Slide ratios, exact coordinates, multi-run rich text, solid & linear gradients, rounded shapes, borders, shadows, rotations, merged tables, cropped images, and speaker notes are exported as **native editable PPTX elements**. `<svg>` and `<canvas>` elements are embedded as **2x crisp transparent PNGs**. |
-| **Web-Only Effects** | Live `backdrop-filter` glass blur, interactive WebGL shaders, looping CSS `@keyframes`, and JS click handlers have no 1:1 dynamic equivalent in the `.pptx` spec; static appearances are preserved as closely as possible without dynamic interactivity. |
-| **Fonts & External Images** | `.pptx` stores font family names; missing web fonts on the target machine fall back to OS fonts. Cross-origin external `<img>` URLs without CORS headers cannot be captured offline by Canvas (Base64 images, inline SVGs, Canvas, and CORS-enabled images pack 100% offline). |
-| **Desktop Office Processes** | Strictly adheres to Chrome's client-side sandbox—operates via `.pptx` upload and export rather than hooking into desktop PowerPoint/WPS processes. |
-
----
-
-## 📁 Project Structure
-
-```text
-web-reverse-inspector/
-├── manifest.json               # Chrome Manifest V3 manifest (v1.5.0 with _locales)
-├── _locales/                   # Native Chrome manifest locales (en / zh_CN)
-├── README.md / README_EN.md    # Bilingual documentation (ZH / EN)
-├── CHANGELOG.md                # Bilingual release history
-├── BRIEF.md                    # Live engineering specification
-├── LICENSE                     # MIT License
-├── sidepanel/                  # Persistent SidePanel UI (ZH/EN live switch, dual workbench, 5 debug tabs, sandbox & exporters)
-├── content/                    # Shadow DOM capture scripts (bilingual banners: inspector / recorder / cropper)
-├── background/                 # Service Worker message bus, storyboard composer & AI routers
-└── utils/                      # Zero-dependency core engines (i18n / zip-lite / pptx-parser / pptx-html-renderer / html-slide-extractor / pptx-exporter / prompt-compiler / style-filter)
-```
+| **Native Editable PPTX** | Coordinates, rich text, solid/linear gradients, rounded shapes, borders, shadows, rotations, merged tables, cropped images, and notes export as **native editable PPTX elements**; `<svg>`/`<canvas>` embed as 2x transparent PNGs; use **Hybrid Mode** for heavy glassmorphism cards. |
+| **Web-Only Dynamic FX** | Interactive WebGL shaders, looping CSS `@keyframes`, and JS event handlers have no dynamic 1:1 equivalent in the static `.pptx` spec. |
+| **External Images & Web Upload** | Non-CORS external images cannot be captured offline by Canvas; if ChatGPT/Gemini web updates block synthetic paste uploads, sending gracefully continues with text while allowing manual paste via `[📸 Copy Image]`. |
 
 ---
 
 ## 📄 License & Privacy
 
 - Licensed under the [MIT License](./LICENSE).
-- **Privacy First**: 100% client-side execution with **zero backend servers, zero telemetry, and zero external analytics**. API keys remain strictly inside local `chrome.storage.local`, and all `.pptx` parsing/generation occurs locally inside your browser memory.
+- **Privacy First**: 100% client-side execution with **zero backend servers, zero telemetry, and zero tracking**. API keys stay in local `chrome.storage.local`, history stays in local `IndexedDB`, and all `.pptx` processing runs strictly inside your browser.

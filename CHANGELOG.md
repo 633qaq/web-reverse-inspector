@@ -4,6 +4,60 @@ All notable changes to **Web Reverse Inspector** are documented in this file (Bi
 
 ---
 
+## [v2.0.0] - 2026-11-20
+
+**对比链接 / Full Changelog**：[`v1.5.0...v2.0.0`](https://github.com/633qaq/web-reverse-inspector/compare/v1.5.0...v2.0.0)
+
+### 🇨🇳 简体中文版本更新内容
+**旗舰大版本更新：围绕真实用户体验与产品闭环落地全部 10 项全维升级，打造纯客户端网页逆向 & HTML ⇄ PPTX 全能工作站。**
+
+#### ✨ 新增功能 (Added)
+- **📄 独立「HTML → PPTX」第三工作台**：支持直接拖入 `.html` 文件或粘贴任意来自 Claude / Cursor / DeepSeek 的单文件 HTML 演示稿，立刻在 Sandbox 预览并一键转为原生可编辑 `.pptx`。
+- **✏️ Sandbox 在线直接改字 + ↗ 新标签页大屏检视**：在 Sandbox 预览栏开启 `✏️ 改字` 可直接点击修改任意文案，修改内容自动同步回纯净 `.html`、大屏检视与 `.pptx` 导出。
+- **🎯 AI 定制改稿 / 换风格指令框**：网页与 PPTX 模式共享自定义指令输入与 4 枚快捷芯片（`1:1 原样` / `套版换文案` / `浅色商务风` / `精简提炼`），告别只能死板原样拷贝的局限。
+- **🕘 IndexedDB 本地历史记录与多页拼合 (`utils/history-store.js`)**：自动缓存最近 25 条捕获/生成记录防误操作丢失，支持一键恢复及**勾选多条单页记录拼合为样式隔离的多页演示稿并导出多页 `.pptx`**。
+- **🔑 BYOK 自定义 Base URL**：OpenAI BYOK 新增自定义 Endpoint 输入，原生兼容 **DeepSeek、OpenRouter、硅基流动、自建中转站及本地免 Key Ollama**。
+- **⚙️ 导出高级选项（混合视觉保真 + 跨平台安全字体映射）**：新增「视觉混合保真模式」（2x 毛玻璃/滤镜底板融合 + 前景可编辑文本框）与「跨平台安全字体映射」（`PingFang SC / Noto Sans SC / Inter` 自动映射为 `Microsoft YaHei / Arial` 防换机折行）。
+- **🖼️ 官方高清图标 + 浏览器右键菜单 + 全局快捷键**：新增 16/32/48/128px 官方 PNG 图标、GitHub 视觉横幅 `assets/hero-banner.svg`、双语右键菜单及全局快捷键（`Alt+Shift+I` 混合吸管 / `Alt+Shift+C` 局部框选）。
+
+#### 🔧 改进与修复 (Improved & Fixed)
+- **彻底清除 Prompt 历史案例偏置 + 实现双语 Prompt 编译**（`utils/prompt-compiler.js`）：完全移除历史硬编码的 `"Genie 4"` / `"水晶球"` / `"鱼眼折射"` 引导词，防止逆向其他 Canvas 网站时产生幻觉；生成的网页与 PPTX Prompt 全面随界面语言切换中英文。
+- **Web 套餐通道真多模态自动贴图**（`router-web-chatgpt.js` / `router-web-gemini.js`）：支持自动将捕获截图/分镜图通过 `DataTransfer` / `ClipboardEvent` 附带至 ChatGPT Web 与 Gemini Web 输入框，并补齐最后 5% 的英文会话状态提示。
+- **PPTX 渲染图表增强**（`utils/pptx-html-renderer.js`）：新增多系列折线/面积图与饼图/环形图原生 SVG 渲染；`utils/pptx-exporter.js` 扩展多种原生预设矢量几何。
+- **优化窄侧边栏空间**：默认折叠「🔍 底层采集特征预览」，大幅扩大 Sandbox 实时预览区视野。
+
+#### ✅ 校验结果 (Verification)
+- 全项目 17 个 `.js` 模块通过 `node --check` 静态检查；
+- 226 组中英双语词条、112 处 HTML `data-i18n*` 与 144 处 JS 翻译调用 100% 匹配；
+- 通过 v2.0 专项测试（34 项）、Batch 5 PPTX 解析测试（10 项）与 Batch 6 HTML→PPTX 往返闭环测试（43 项）。
+
+---
+
+### 🇺🇸 English Release Notes
+**Major Flagship Release: Delivers 10 comprehensive UX, product, and engine upgrades—turning Web Reverse Inspector into a complete client-side Web Reverse & HTML ⇄ PPTX workstation.**
+
+#### ✨ Added
+- **📄 Dedicated「HTML → PPTX」Workbench**: Drop `.html` files or paste raw HTML slide code from Claude / Cursor / DeepSeek to preview and convert directly into native editable `.pptx`.
+- **✏️ Sandbox Inline Live Text Editing + ↗ Fullscreen Tab View**: Toggle `✏️ Edit` to click and modify any text in-place; edits carry cleanly into `.pptx`, `.html`, and fullscreen previews.
+- **🎯 Custom AI Rewrite / Restyle Directive Box**: Optional directive field with 4 one-click presets (`1:1 Exact`, `Swap Copy`, `Light Biz`, `Tighten Copy`) for both Web and PPTX workflows.
+- **🕘 IndexedDB Local History & Multi-Slide Merge (`utils/history-store.js`)**: Automatically retains the last 25 sessions locally for one-click restore and multi-select merging into CSS-scoped multi-slide `.pptx` decks.
+- **🔑 BYOK Custom Base URL**: OpenAI BYOK now supports custom OpenAI-compatible endpoints (**DeepSeek, OpenRouter, SiliconFlow, proxies, and keyless local Ollama**).
+- **⚙️ Advanced PPTX Export Preferences**: Added **Hybrid Visual Fidelity Mode** (2x rasterized glass/filtered card surfaces + editable text overlays) and **Cross-OS Safe Font Mapping** (`PingFang SC / Noto Sans SC / Inter` → `Microsoft YaHei / Arial`).
+- **🖼️ Official Icons, Context Menus & Shortcuts**: Added 16/32/48/128px PNG extension icons, README visual hero banner, bilingual right-click context menus, and global shortcuts (`Alt+Shift+I` / `Alt+Shift+C`).
+
+#### 🔧 Improved & Fixed
+- **Unbiased Bilingual Prompt Compiler** (`utils/prompt-compiler.js`): Removed all legacy hardcoded demo biases (`Genie 4` / orb / fisheye lens) and added full English & Chinese prompt compilation.
+- **Web Session Auto-Image Attachment** (`router-web-chatgpt.js`, `router-web-gemini.js`): Automatically attaches captured PNGs/storyboards via `DataTransfer` / `ClipboardEvent('paste')` with graceful fallback, and completed the remaining English status messages.
+- **Expanded Chart & Shape Fidelity**: Added native SVG rendering for line/area and pie/doughnut charts in `pptx-html-renderer.js` plus expanded OOXML shape presets in `pptx-exporter.js`.
+- **Cleaner SidePanel Space**: Collapsed the low-level debug drawer by default to give Sandbox previews maximum viewport height.
+
+#### ✅ Verification
+- All 17 `.js` modules passed `node --check`;
+- Verified 100% EN/ZH parity across 226 keys, 112 HTML `data-i18n*` attributes, and 144 JS calls;
+- Passed all v2.0 suite tests (34/34), Batch 5 PPTX parsing tests (10/10), and Batch 6 round-trip export assertions (43/43).
+
+---
+
 ## [v1.5.0] - 2026-11-19
 
 **对比链接 / Full Changelog**：[`v1.4.0...v1.5.0`](https://github.com/633qaq/web-reverse-inspector/compare/v1.4.0...v1.5.0)

@@ -16,6 +16,7 @@
           <span>Reverse Inspector</span>
         </div>
         <div class="top-actions">
+          <button id="toggleHistoryBtn" class="icon-btn" data-i18n-title="historyToggleTitle" title="本地历史记录与多页拼合">🕘</button>
           <button
             id="langToggleBtn"
             class="lang-btn"
@@ -24,7 +25,7 @@
             title="Switch UI to English / 切换为英文界面"
           >EN</button>
           <button id="themeToggleBtn" class="icon-btn" data-i18n-title="themeToggleTitle" title="切换深色/浅色主题">🌓</button>
-          <button id="toggleSettingsBtn" class="icon-btn" data-i18n-title="settingsToggleTitle" title="配置 API Key 与模型参数">⚙️</button>
+          <button id="toggleSettingsBtn" class="icon-btn" data-i18n-title="settingsToggleTitle" title="配置 API Key、自定义 Base URL 与导出选项">⚙️</button>
         </div>
       </div>
 
@@ -33,7 +34,7 @@
           <option value="web-chatgpt" data-i18n="channelWebChatgpt">🌐 ChatGPT Web 套餐</option>
           <option value="web-gemini" data-i18n="channelWebGemini">🌐 Gemini Web 套餐</option>
           <option value="byok-gemini" data-i18n="channelByokGemini">🔑 Google AI Studio (BYOK)</option>
-          <option value="byok-openai" data-i18n="channelByokOpenai">🔑 OpenAI 官方 API (BYOK)</option>
+          <option value="byok-openai" data-i18n="channelByokOpenai">🔑 OpenAI / 兼容 API (BYOK)</option>
         </select>
 
         <div id="statusBadge" class="status-badge status-warn" data-i18n-title="statusBadgeTitle" title="点击刷新通道连通状态">
@@ -51,7 +52,7 @@
           class="custom-model-input hidden"
           type="text"
           data-i18n-placeholder="customModelPlaceholder"
-          placeholder="输入自定义模型名称 (如 GPT-6.2 Astra Max / 4 Argon)"
+          placeholder="输入自定义模型名称 (如 GPT-6.2 Astra Max / deepseek-chat)"
           autocomplete="off"
         />
       </div>
@@ -59,10 +60,10 @@
       <div id="statusDetail" class="status-detail" data-i18n="statusInitSync">正在同步本地会话与配置状态...</div>
     </header>
 
-    <!-- API Key 与模型配置抽屉 -->
+    <!-- API Key、自定义 Base URL 与导出偏好抽屉 -->
     <section id="settingsDrawer" class="settings-drawer hidden">
       <div class="drawer-header">
-        <span data-i18n="drawerTitle">🔑 BYOK 密钥与模型参数配置</span>
+        <span data-i18n="drawerTitle">🔑 BYOK 密钥、Base URL 与导出配置</span>
         <button id="closeSettingsBtn" class="text-btn" data-i18n="drawerClose">收起 ✕</button>
       </div>
 
@@ -82,7 +83,7 @@
       </div>
 
       <div class="form-group">
-        <label for="openaiApiKey" data-i18n="labelOpenaiKey">OpenAI API Key</label>
+        <label for="openaiApiKey" data-i18n="labelOpenaiKey">OpenAI / 兼容 API Key (DeepSeek / OpenRouter / Ollama)</label>
         <div class="input-row">
           <input id="openaiApiKey" type="password" placeholder="sk-..." autocomplete="off" />
           <select id="openaiModel" class="sub-select">
@@ -96,22 +97,61 @@
         </div>
       </div>
 
+      <div class="form-group">
+        <label for="openaiBaseUrl" data-i18n="labelOpenaiBaseUrl">自定义 API Base URL（选填，留空默认官方 OpenAI）</label>
+        <input
+          id="openaiBaseUrl"
+          type="text"
+          data-i18n-placeholder="openaiBaseUrlPlaceholder"
+          placeholder="https://api.openai.com/v1 或 https://api.deepseek.com/v1"
+          autocomplete="off"
+        />
+      </div>
+
+      <div class="form-group">
+        <label for="pptxExportModeSelect" data-i18n="labelExportOptions">📊 .pptx 导出偏好设置</label>
+        <select id="pptxExportModeSelect" class="full-select">
+          <option value="native" data-i18n="exportModeNative">标准原生可编辑（推荐）</option>
+          <option value="hybrid" data-i18n="exportModeHybrid">视觉混合保真（毛玻璃 2x 融合 + 可编辑字）</option>
+        </select>
+        <label class="checkbox-row">
+          <input id="fontSafeMapToggle" type="checkbox" checked />
+          <span data-i18n="fontSafeMapLabel">开启跨平台安全字体映射（防换电脑折行跑版）</span>
+        </label>
+      </div>
+
       <div class="drawer-footer">
         <span id="saveToast" class="save-toast" data-i18n="saveToastDefault">自动持久化至 chrome.storage.local</span>
         <button id="saveConfigBtn" class="primary-sm-btn" data-i18n="saveConfigBtn">保存并检测</button>
       </div>
     </section>
 
-    <!-- 四大核心采集与 PPTX 复刻操作区 -->
+    <!-- 本地历史记录抽屉（IndexedDB + 多页拼合） -->
+    <section id="historyDrawer" class="settings-drawer hidden">
+      <div class="drawer-header">
+        <span data-i18n="historyDrawerTitle">🕘 本地历史记录 (最近 25 条)</span>
+        <div class="history-header-actions">
+          <button id="mergeHistoryBtn" class="mini-accent-btn" data-i18n="historyMergeBtn">🧩 拼合多页演示稿</button>
+          <button id="clearHistoryBtn" class="text-btn" data-i18n="historyClearBtn">清空</button>
+          <button id="closeHistoryBtn" class="text-btn" data-i18n="drawerClose">收起 ✕</button>
+        </div>
+      </div>
+      <div id="historyList" class="history-list">
+        <div class="empty-hint" data-i18n="historyEmpty">暂无历史记录。每次网页捕获、PPTX 解析、AI 生成或 HTML 导入都会自动保存于此。</div>
+      </div>
+    </section>
+
+    <!-- 三大核心工作台操作区 -->
     <section class="capture-panel">
       <div class="section-label">
         <span data-i18n="workbenchModeLabel">工作台模式</span>
-        <span id="activeStageTag" class="stage-tag" data-i18n="stageTag">v1.5 · 中英双语 · HTML ⇄ PPTX 无损闭环</span>
+        <span id="activeStageTag" class="stage-tag" data-i18n="stageTag">v2.0 · 全能复刻 & HTML ⇄ PPTX</span>
       </div>
 
-      <div class="workbench-tabs">
-        <button id="wbTabWeb" class="wb-tab active" data-wb="web" data-i18n="wbTabWeb">🌐 网页捕获逆向</button>
-        <button id="wbTabPptx" class="wb-tab" data-wb="pptx" data-i18n="wbTabPptx">📽️ PPTX 文件复刻 (95%+)</button>
+      <div class="workbench-tabs workbench-tabs-3">
+        <button id="wbTabWeb" class="wb-tab active" data-wb="web" data-i18n="wbTabWeb">🌐 网页逆向</button>
+        <button id="wbTabPptx" class="wb-tab" data-wb="pptx" data-i18n="wbTabPptx">📽️ PPTX 复刻</button>
+        <button id="wbTabHtml" class="wb-tab" data-wb="html" data-i18n="wbTabHtml">📄 HTML → PPTX</button>
       </div>
 
       <!-- 模式 A：网页采集 -->
@@ -221,19 +261,60 @@
           </button>
         </div>
       </div>
+
+      <!-- 模式 C：直接导入/粘贴任意 HTML 演示稿 → 转可编辑 .pptx -->
+      <div id="htmlDirectBox" class="hidden">
+        <div id="htmlDropZone" class="pptx-dropzone html-dropzone" tabindex="0">
+          <input id="htmlFileInput" type="file" accept=".html,.htm" class="hidden" />
+          <div class="pptx-drop-title" data-i18n-html="htmlDropTitleHtml">点击上传或拖入 <code>.html</code> 演示稿</div>
+          <div class="pptx-drop-sub" data-i18n="htmlDropSub">支持 Claude / Cursor / DeepSeek 生成的任意单文件 HTML，预览改字后一键转可编辑 .pptx</div>
+        </div>
+        <textarea
+          id="htmlPasteInput"
+          class="html-paste-area"
+          rows="3"
+          data-i18n-placeholder="htmlPastePlaceholder"
+          placeholder="或直接粘贴完整 HTML 演示稿源码 (<!DOCTYPE html>...)..."
+        ></textarea>
+        <div class="html-direct-actions">
+          <button id="loadHtmlToSandboxBtn" class="mock-trigger-btn" data-i18n="htmlLoadPreviewBtn">👁️ 载入 Sandbox 预览</button>
+          <button id="directHtmlToPptxBtn" class="sandbox-pptx-btn html-direct-pptx-btn" data-i18n="htmlDirectExportBtn">📊 一键转可编辑 .pptx</button>
+        </div>
+      </div>
+
+      <!-- 通用：AI 定制改稿 / 换风格指令框（网页 & PPTX 共享） -->
+      <div id="directiveBox" class="directive-box">
+        <div class="directive-header">
+          <span class="directive-label" data-i18n="directiveLabel">🎯 AI 定制改稿 / 换风格指令（选填，留空即 1:1 原样复刻）</span>
+        </div>
+        <div class="directive-chips">
+          <button type="button" class="directive-chip" data-preset="exact" data-i18n="chipExact">1:1 原样</button>
+          <button type="button" class="directive-chip" data-preset="rewrite" data-i18n="chipRewrite">套版换文案</button>
+          <button type="button" class="directive-chip" data-preset="lightBiz" data-i18n="chipLightBiz">浅色商务风</button>
+          <button type="button" class="directive-chip" data-preset="concise" data-i18n="chipConcise">精简提炼</button>
+        </div>
+        <input
+          id="customDirectiveInput"
+          class="directive-input"
+          type="text"
+          data-i18n-placeholder="directivePlaceholder"
+          placeholder="例如：保留原版式与配色，把文案替换为我的《2026 Q4 产品复盘》大纲..."
+          autocomplete="off"
+        />
+      </div>
     </section>
 
-    <!-- 捕获特征调试预览区 -->
+    <!-- 捕获特征调试预览区（默认折叠，为底部 Sandbox 留出充裕空间） -->
     <section class="debug-section">
       <div id="debugHeader" class="debug-header">
         <div class="debug-title">
           <span data-i18n="debugTitle">🔍 底层采集特征预览</span>
           <span id="captureSummaryBadge" class="mini-badge" data-i18n="captureNotStarted">未采集</span>
         </div>
-        <span id="debugCollapseIcon" class="collapse-icon">▼</span>
+        <span id="debugCollapseIcon" class="collapse-icon" style="transform: rotate(-90deg);">▼</span>
       </div>
 
-      <div id="debugBody" class="debug-body">
+      <div id="debugBody" class="debug-body hidden">
         <div class="debug-tabs">
           <button class="debug-tab active" data-debug-tab="visual" data-i18n="debugTabVisual">视觉截图</button>
           <button class="debug-tab" data-debug-tab="layout" data-i18n="debugTabLayout">布局结构</button>
@@ -305,8 +386,10 @@
         <div class="sandbox-bar">
           <span id="sandboxStatusText" class="sandbox-status" data-i18n="sandboxStatusDefault">安全隔离沙箱 (`iframe[sandbox="allow-scripts"]`)</span>
           <div class="sandbox-actions">
+            <button id="toggleSandboxEditBtn" class="sandbox-mini-btn" data-i18n="sandboxEditBtn" data-i18n-title="sandboxEditTitle" title="开启后可直接在预览画面中点击修改任意文字，导出 .pptx/.html 自动同步">✏️ 改字</button>
+            <button id="openFullscreenTabBtn" class="sandbox-mini-btn" data-i18n="sandboxFullscreenBtn" data-i18n-title="sandboxFullscreenTitle" title="在新标签页全屏大视野检视当前 HTML 演示稿">↗ 大屏</button>
             <button id="sandboxDownloadHtmlBtn" class="sandbox-mini-btn" data-i18n="sandboxDownloadHtmlBtn" data-i18n-title="sandboxDownloadHtmlTitle" title="下载当前预览的纯净单文件 .html">📥 .html</button>
-            <button id="sandboxExportPptxBtn" class="sandbox-pptx-btn" data-i18n="sandboxExportPptxBtn" data-i18n-title="sandboxExportPptxTitle" title="确认当前预览无误后，一键高保真转换为可编辑 .pptx 文件">📊 确认并导出 .pptx</button>
+            <button id="sandboxExportPptxBtn" class="sandbox-pptx-btn" data-i18n="sandboxExportPptxBtn" data-i18n-title="sandboxExportPptxTitle" title="确认当前预览无误后，一键高保真转换为可编辑 .pptx 文件">📊 导出 .pptx</button>
             <button id="refreshSandboxBtn" class="text-btn" data-i18n-title="refreshSandboxTitle" title="重新挂载 Sandbox 预览">🔄</button>
           </div>
         </div>

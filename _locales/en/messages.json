@@ -4,11 +4,19 @@
     "description": "Extension display name"
   },
   "extDescription": {
-    "message": "Client-side web UI/motion reverse engineering & 4s storyboard capture, with zero-dependency OOXML engine for 95%+ PPTX replication, 1:1 HTML preview, and editable .pptx export.",
+    "message": "Client-side web UI/motion reverse engineering & 4s storyboard capture, with zero-dependency OOXML engine for 95%+ PPTX replication, live HTML editing, and editable .pptx export.",
     "description": "Extension description"
   },
   "actionTitle": {
     "message": "Open Web Reverse Inspector SidePanel",
     "description": "Toolbar icon hover title"
+  },
+  "cmdInspector": {
+    "message": "Start Element Inspector (Hybrid DOM + Crop)",
+    "description": "Shortcut description for inspector"
+  },
+  "cmdCropper": {
+    "message": "Start Region Marquee Screenshot",
+    "description": "Shortcut description for cropper"
   }
 }
